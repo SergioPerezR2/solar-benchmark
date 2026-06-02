@@ -1,0 +1,35 @@
+# Entornos virtuales
+env/
+envs/
+environments/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Datos generados / artefactos grandes
+outputs/
+mlruns/
+models/
+datasets/
+*.keras
+*.npy
+*.h5
+
+# Datos reproducibles (generados por download_pvgis.py)
+data/pvgis_raw.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Sistema
+.Trash-*/
+.DS_Store
+*.swp
