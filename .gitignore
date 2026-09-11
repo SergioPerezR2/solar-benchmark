@@ -33,3 +33,7 @@ build/
 .Trash-*/
 .DS_Store
 *.swp
+
+# Logs de ejecución de benchmark
+benchmark.log
+mlflow_ui.log
