@@ -1,6 +1,6 @@
 # solar-benchmark
 
-Comparative benchmark of metaheuristic hyperparameter optimization (**GA**, **PSO**, **ABC**, **TPE**) for deep learning models (**MLP**, **LSTM**, **GRU**) applied to global solar irradiance (GHI) forecasting. Code and experiments supporting the article *"Comparative Benchmark of Metaheuristic Hyperparameter Optimization for Deep Learning Models in Global Solar Irradiance Forecasting"* (submitted to *Energies*, MDPI).
+Comparative benchmark of metaheuristic hyperparameter optimization (**GA**, **PSO**, **ABC**, **TPE**) for deep learning models (**MLP**, **LSTM**, **GRU**) applied to global solar irradiance (GHI) forecasting. Code and experiments supporting the article *"Comparative Benchmark of Metaheuristic Hyperparameter Optimization for Deep Learning Models in Global Solar Irradiance Forecasting"*.
 
 ## Study area and data
 
