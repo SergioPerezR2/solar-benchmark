@@ -285,6 +285,7 @@ if os.path.exists(LD):
         for ax, c in zip(axes, ('p_true_best_null', 'p_same_winner_null', 'p_prop_null')):
             z = ld[ld.n_runs >= (3 if c == 'p_prop_null' else 1)].groupby('n_runs')[c].agg(['min', 'max'])
             ax.fill_between(z.index, 100 * z['min'], 100 * z['max'], color='0.6', alpha=0.35, lw=0, zorder=0)
+            ax.plot(z.index, 100 * (z['min'] + z['max']) / 2, color='0.45', ls='--', lw=1.0, zorder=1)
     for i, (ax, t, yl) in enumerate(zip(axes, ['Winner is the true best', 'Two studies agree on winner',
                                               'Proposed method "wins"'],
                                          ['Studies (%)'] * 3)):

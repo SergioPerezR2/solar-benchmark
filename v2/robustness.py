@@ -13,6 +13,10 @@ endpoint primario:
   5. Valores analíticos de referencia para la emulación de diseños de la
      literatura (la emulación está en analyze.py).
   6. Frecuencia de la fase de exploradoras (scouts) en ABC.
+  8. omega² por definición del error, Friedman con recorte nocturno y prueba de
+     permutación del F del optimizador.
+  9. Ruido del reentrenamiento final, medido con los incumbentes idénticos de
+     PSO, GA y RS con b = 10 (evalúan las mismas 10 configuraciones iniciales).
 
 Uso:  python robustness.py [salida]      (por defecto outputs/analysis)
 """
@@ -235,6 +239,57 @@ num['abc_runs_with_scout'] = int(np.sum(np.array(scouts) > 0))
 b = D[D.opt == 'BOHB']
 num['bohb_epochs'] = [float(b.hpo_epochs.min()), float(b.hpo_epochs.max())]
 num['n_failed_evals'] = int(sum(h['val_mae'] >= 9999 for r in recs.values() for h in r['history']))
+
+# ── 8. Varianza por definición del error, Friedman con recorte y permutación ──
+def omega_table(t, col):
+    yv = t[col]; gm = yv.mean(); ss_tot = ((yv - gm) ** 2).sum()
+    a = t.groupby('model')[col].transform('mean'); o = t.groupby('opt')[col].transform('mean')
+    sd = t.groupby('seed')[col].transform('mean'); ao = t.groupby(['model', 'opt'])[col].transform('mean')
+    ss = {'arch': ((a - gm) ** 2).sum(), 'opt': ((o - gm) ** 2).sum(), 'seed': ((sd - gm) ** 2).sum(),
+          'axo': ((ao - a - o + gm) ** 2).sum()}
+    dfs = {'arch': 2, 'opt': 6, 'seed': 29, 'axo': 12}
+    ms = (ss_tot - sum(ss.values())) / df_res
+    out = {k: max(0.0, (v - dfs[k] * ms) / (ss_tot + ms)) for k, v in ss.items()}
+    out['F_opt'] = (ss['opt'] / 6) / ms
+    out['p_opt'] = float(stats.f.sf(out['F_opt'], 6, df_res))
+    return out
+
+
+num['omega_by_endpoint'] = {e: omega_table(D, e) for e in masks}
+num['friedman_clipped'] = {}
+for m in MODELS:
+    W = D[D.model == m].pivot(index='seed', columns='opt', values='all_clipped')[OPTS]
+    chi, pf = stats.friedmanchisquare(*[W[c] for c in OPTS])
+    num['friedman_clipped'][m] = {'chi2': float(chi), 'p': float(pf), 'best': W.rank(axis=1).mean().idxmin()}
+rng_p = np.random.default_rng(0)
+F0 = num['omega_by_endpoint']['all']['F_opt']
+blocks = D.model + '_' + D.seed.astype(str)
+T = D.copy(); cnt = 0; B_PERM = 1000
+for _ in range(B_PERM):
+    T['opt'] = D.groupby(blocks).opt.transform(lambda x: rng_p.permutation(x.values)).values
+    cnt += omega_table(T, 'all')['F_opt'] >= F0
+num['perm_p_optimizer'] = (cnt + 1) / (B_PERM + 1)
+
+# ── 9. Ruido de reentrenamiento: incumbentes idénticos con b = 10 ────────────
+def final(r, b):
+    F = r['finals'][b]
+    while 'same_as' in F:
+        F = r['finals'][F['same_as']]
+    return F
+
+
+diffs = []; n_pairs = 0
+for m in MODELS:
+    for s_ in range(30):
+        inc = {o: recs[(m, o, s_)] for o in ('PSO', 'GA', 'RS')}
+        for a_, b_ in (('PSO', 'GA'), ('PSO', 'RS'), ('GA', 'RS')):
+            n_pairs += 1
+            if inc[a_]['finals']['B10']['params'] == inc[b_]['finals']['B10']['params']:
+                diffs.append(final(inc[a_], 'B10')['test']['all']['mae'] - final(inc[b_], 'B10')['test']['all']['mae'])
+diffs = np.array(diffs)
+num['retrain_noise'] = {'same_incumbent': int(len(diffs)), 'pairs': n_pairs,
+                        'median_abs': float(np.median(np.abs(diffs))), 'max_abs': float(np.abs(diffs).max()),
+                        'sd_single': float(diffs.std(ddof=1) / np.sqrt(2))}
 
 json.dump(num, open(os.path.join(OUT, 'robustness.json'), 'w'), indent=1, default=float)
 print(EP.round(3).to_string())
