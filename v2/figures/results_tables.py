@@ -59,7 +59,7 @@ for m in MODELS:
         rows.append((m, o, g))
 lines = [r'\begin{tabular}{llccccc}', r'\toprule',
          r'\textbf{Model} & \textbf{Optimizer} & \textbf{MAE} & \textbf{RMSE} & \textbf{Daytime MAE} & '
-         r'$\boldsymbol{S_{\mathrm{smart}}}$ \textbf{(\%)} & \textbf{Rolling MAE} \\', r'\midrule']
+         r'$\boldsymbol{S_{\mathrm{MAE}}/S_{\mathrm{RMSE}}}$ \textbf{(\%)} & \textbf{Rolling MAE} \\', r'\midrule']
 for k, (m, o, g) in enumerate(rows):
     best = b100[(b100.model == m) & (b100.optimizer != 'DEFAULT')].groupby('optimizer').all_mae.mean().idxmin()
     mae = pm(g.all_mae.mean(), g.all_mae.std())
@@ -71,7 +71,7 @@ for k, (m, o, g) in enumerate(rows):
         roll += f'$^{{({nbad})}}$'
     lines.append(f"{m if (k == 0 or rows[k - 1][0] != m) else ''} & {lab(o)} & {mae} & "
                  f"{pm(g.all_rmse.mean(), g.all_rmse.std())} & {pm(g.day_ghi50_mae.mean(), g.day_ghi50_mae.std())} & "
-                 f"{100 * g.all_skill_rmse_smart.mean():.1f} & {roll} \\\\")
+                 f"{100 * g.all_skill_mae_smart.mean():.1f} / {100 * g.all_skill_rmse_smart.mean():.1f} & {roll} \\\\")
     if o == 'DEFAULT' and m != MODELS[-1]:
         lines.append(r'\midrule')
 lines.append(r'\midrule')
@@ -121,13 +121,30 @@ out.append(('tab:stat_tests', '\n'.join(lines)))
 N['total_equiv_d1'] = int(main['equiv_d1'].sum()); N['total_pairs'] = len(main)
 N['total_sig'] = int(main.significant.sum())
 
-# ── Descomposición de varianza ────────────────────────────────────────────────
-lines = [r'\begin{tabular}{lcc}', r'\toprule', r'\textbf{Term} & \textbf{Sum of squares} & $\boldsymbol{\eta^2}$ \textbf{(\%)} \\', r'\midrule']
+# ── Descomposición de varianza (con gl, F y omega², de robustness.py) ────────
 names = {'architecture': 'Architecture', 'optimizer': 'Optimizer', 'architecture x optimizer': 'Architecture $\\times$ optimizer',
          'seed (block)': 'Seed (block)', 'residual': 'Residual'}
-for _, r in var.iterrows():
-    lines.append(f"{names.get(r.term, r.term)} & {r.SS:.1f} & {100 * r.eta2:.1f} \\\\")
-    N[f"eta2_{r.term.replace(' ', '_')}"] = round(100 * float(r.eta2), 1)
+VO = os.path.join(A, 'variance_omega2.csv')
+if os.path.exists(VO):
+    vo = pd.read_csv(VO)
+    lines = [r'\begin{tabular}{lcccccc}', r'\toprule',
+             r'\textbf{Term} & \textbf{df} & \textbf{Sum of squares} & $\boldsymbol{F}$ & $\boldsymbol{p}$ & '
+             r'$\boldsymbol{\eta^2}$ \textbf{(\%)} & $\boldsymbol{\omega^2}$ \textbf{(\%)} \\', r'\midrule']
+    for _, r in vo.iterrows():
+        res = r.term == 'residual'
+        pv = '--' if res else (r'$<0.001$' if r.p < 0.001 else f'{r.p:.3f}')
+        lines.append(f"{names.get(r.term, r.term)} & {int(r.df)} & {r.SS:.1f} & {'--' if res else f'{r.F:.2f}'} & {pv} & "
+                     f"{100 * r.eta2:.1f} & {'--' if res else f'{100 * r.omega2:.1f}'} \\\\")
+        N[f"eta2_{r.term.replace(' ', '_')}"] = round(100 * float(r.eta2), 1)
+        if not res:
+            N[f"omega2_{r.term.replace(' ', '_')}"] = round(100 * float(r.omega2), 2)
+            N[f"F_{r.term.replace(' ', '_')}"] = round(float(r.F), 2)
+            N[f"p_{r.term.replace(' ', '_')}"] = float(r.p)
+else:
+    lines = [r'\begin{tabular}{lcc}', r'\toprule', r'\textbf{Term} & \textbf{Sum of squares} & $\boldsymbol{\eta^2}$ \textbf{(\%)} \\', r'\midrule']
+    for _, r in var.iterrows():
+        lines.append(f"{names.get(r.term, r.term)} & {r.SS:.1f} & {100 * r.eta2:.1f} \\\\")
+        N[f"eta2_{r.term.replace(' ', '_')}"] = round(100 * float(r.eta2), 1)
 lines += [r'\bottomrule', r'\end{tabular}']
 out.append(('tab:variance', '\n'.join(lines)))
 
@@ -239,6 +256,8 @@ for m in MODELS:
                                round(float(g.groupby('optimizer').all_mae.std().max()), 2)]
     N[f'{m}_skill_smart_range'] = [round(100 * float(g.groupby('optimizer').all_skill_rmse_smart.mean().min()), 1),
                                    round(100 * float(g.groupby('optimizer').all_skill_rmse_smart.mean().max()), 1)]
+    N[f'{m}_skill_mae_smart_range'] = [round(100 * float(g.groupby('optimizer').all_skill_mae_smart.mean().min()), 1),
+                                       round(100 * float(g.groupby('optimizer').all_skill_mae_smart.mean().max()), 1)]
     N[f'{m}_skill_pers_range'] = [round(100 * float(g.groupby('optimizer').all_skill_rmse_pers.mean().min()), 1),
                                   round(100 * float(g.groupby('optimizer').all_skill_rmse_pers.mean().max()), 1)]
     N[f'{m}_frac_runs_beat_smart_mae'] = round(100 * float((g.all_mae < refs.query(
@@ -309,13 +328,20 @@ if os.path.exists(LD):
              r'$\boldsymbol{n}$ & \textbf{Winner is} & \textbf{Same winner} & \multicolumn{3}{c}{\textbf{Proposed method significantly better than a rival}} \\',
              r'\cmidrule(lr){4-6}',
              r' & \textbf{true best} & \textbf{in replication} & \textbf{Uncorrected} & \textbf{Holm} & \textbf{Uncorrected, gap $>\delta$} \\', r'\midrule']
+    def both(c, n):
+        # valor observado y, entre paréntesis, el esperado por azar con el mismo diseño
+        obs = fmt(c, n)
+        return obs if obs == '--' or c + '_null' not in ld else f"{obs} ({fmt(c + '_null', n)})"
     for n in sorted(ld.n_runs.unique()):
-        lines.append(f"{n} & {fmt('p_true_best', n)} & {fmt('p_same_winner', n)} & {fmt('p_prop', n)} & "
-                     f"{fmt('p_prop_holm', n)} & {fmt('p_prop_delta', n)} \\\\")
+        lines.append(f"{n} & {both('p_true_best', n)} & {both('p_same_winner', n)} & {both('p_prop', n)} & "
+                     f"{both('p_prop_holm', n)} & {both('p_prop_delta', n)} \\\\")
         for c in ('p_true_best', 'p_same_winner', 'p_prop', 'p_prop_holm', 'p_prop_delta', 'p_any_sig', 'p_any_sig_holm'):
-            lo_, hi_ = rg(c, n)
-            if not np.isnan(lo_):
-                N[f'lit_n{n}_{c}'] = [round(float(lo_), 1), round(float(hi_), 1)]
+            for suf in ('', '_null'):
+                if c + suf not in ld:
+                    continue
+                lo_, hi_ = rg(c + suf, n)
+                if not np.isnan(lo_):
+                    N[f'lit_n{n}_{c}{suf}'] = [round(float(lo_), 1), round(float(hi_), 1)]
     lines += [r'\bottomrule', r'\end{tabular}']
     out.append(('tab:lit_designs', '\n'.join(lines)))
 
@@ -351,6 +377,38 @@ if os.path.exists(os.path.join(SD, 'fidelity.csv')):
     N['sur_n_evals_total'] = int(fi.n_evals.sum())
     lines += [r'\bottomrule', r'\end{tabular}']
     out.append(('tab:surrogate', '\n'.join(lines)))
+
+# ── Robustez frente a la definición del error (robustness.py) ────────────────
+RE = os.path.join(A, 'robust_endpoints.csv')
+if os.path.exists(RE):
+    re_ = pd.read_csv(RE)
+    en = {'all': 'All hours (primary)', 'all_clipped': 'All hours, night clipped',
+          'day_ghi50': r'Daytime, GHI $>50$~W/m$^2$', 'day_elev5': r'Daytime, $\alpha_s>5^{\circ}$'}
+    lines = [r'\begin{tabular}{llcccccc}', r'\toprule',
+             r'\textbf{Endpoint} & \textbf{Model} & \textbf{Smart pers.} & \textbf{Tuned (range)} & $\boldsymbol{S_{\mathrm{MAE}}}$ \textbf{(\%)} & '
+             r'\textbf{Sig.} & \multicolumn{2}{c}{\textbf{Equivalent}} \\', r'\cmidrule(lr){7-8}',
+             r' & & \textbf{(W/m$^2$)} & \textbf{(W/m$^2$)} & & \textbf{(Holm)} & $\delta=0.5$ & $\delta=1$ \\', r'\midrule']
+    for i, e in enumerate(en):
+        g = re_[re_.endpoint == e].set_index('model').reindex(MODELS)
+        for j, m in enumerate(MODELS):
+            r = g.loc[m]
+            lines.append(f"{en[e] if j == 0 else ''} & {m} & {r.smart_mae:.2f} & {r.mae_min:.2f}--{r.mae_max:.2f} & "
+                         f"{100 * r.skill_mae_min:.1f}--{100 * r.skill_mae_max:.1f} & {int(r.n_sig_holm)}/21 & "
+                         f"{int(r.n_equiv_d05)} & {int(r.n_equiv_d1)} \\\\")
+        if i < len(en) - 1:
+            lines.append(r'\midrule')
+    lines += [r'\bottomrule', r'\end{tabular}']
+    out.append(('tab:robust_endpoints', '\n'.join(lines)))
+    for e in en:
+        g = re_[re_.endpoint == e]
+        N[f'rob_{e}_equiv_d1'] = int(g.n_equiv_d1.sum()); N[f'rob_{e}_equiv_d05'] = int(g.n_equiv_d05.sum())
+        N[f'rob_{e}_sig'] = int(g.n_sig_holm.sum())
+        N[f'rob_{e}_skill'] = [round(100 * float(g.skill_mae_min.min()), 1), round(100 * float(g.skill_mae_max.max()), 1)]
+        N[f'rob_{e}_gain'] = [round(float(g.gain_min.min()), 2), round(float(g.gain_max.max()), 2)]
+        N[f'rob_{e}_maxdiff'] = round(float(g.max_abs_diff.max()), 2)
+RJ = os.path.join(A, 'robustness.json')
+if os.path.exists(RJ):
+    N['robustness'] = {k: v for k, v in json.load(open(RJ)).items() if not k.startswith('rob_')}
 
 with open(os.path.join(A, 'tables.tex'), 'w') as f:
     for k, t in out:

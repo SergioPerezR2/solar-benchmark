@@ -34,7 +34,7 @@ def load_runs():
     rows, hist = [], {}
     for path in glob.glob(os.path.join(C.RES_DIR, '*', '*.json')):
         r = json.load(open(path))
-        if r.get('dry'):
+        if r.get('dry') or r.get('tag') == 'repro':      # repro: solo para repro_check.py
             continue
         base = {k: r[k] for k in ('run', 'model', 'optimizer', 'seed', 'pop', 'tag')}
         base.update({'best_val_mae': r['best_val_mae'], 'hpo_time_s': r['hpo_time_s'],
@@ -259,7 +259,14 @@ def literature_designs(df, sizes=(1, 3, 5, 10, 15, 20, 30), n_rep=2000, seed=1):
     """Emula estudios con n corridas independientes por optimizador.
 
     Cada estudio remuestrea (con reemplazo) n semillas para cada optimizador de
-    forma independiente, como en la literatura, y se estima:
+    forma independiente, como en la literatura. Es un bootstrap plug-in: la
+    distribución observada de cada optimizador hace de población, de modo que
+    sus medias observadas se toman como verdaderas (con n grande, las tasas de
+    detección son una cota superior). Cada cantidad se calcula también bajo la
+    hipótesis nula (sufijo _null) con los datos centrados por columna, que
+    igualan las medias de los optimizadores y conservan la forma de sus
+    distribuciones; así se obtiene la tasa esperada por azar con el mismo diseño.
+    Se estima:
       - p_true_best: el optimizador con menor media es el mejor por media de 30 semillas;
       - p_same_winner: dos estudios independientes del mismo diseño eligen el mismo ganador;
       - gap_median: brecha aparente mejor–peor (W/m²);
@@ -270,8 +277,10 @@ def literature_designs(df, sizes=(1, 3, 5, 10, 15, 20, 30), n_rep=2000, seed=1):
     core = df[(df.tag == 'core') & (df.budget == FULL) & (df.optimizer != 'DEFAULT')]
     rng = np.random.default_rng(seed)
     rows = []
-    for m, sub in core.groupby('model'):
+    for (m, sub), label in [(g, lab) for g in core.groupby('model') for lab in ('', '_null')]:
         X = complete_blocks(sub, OPT_ORDER, 'all_mae').to_numpy()       # semillas x optimizadores
+        if label:
+            X = X - X.mean(axis=0) + X.mean()                            # H0: medias iguales
         n_s, k = X.shape
         best = int(np.argmin(X.mean(axis=0)))
         for n in sizes:
@@ -308,10 +317,15 @@ def literature_designs(df, sizes=(1, 3, 5, 10, 15, 20, 30), n_rep=2000, seed=1):
                                  for _ in range(n_rep)])
             row = {'model': m, 'n_runs': n, 'p_true_best': float((win[0] == best).mean()),
                    'p_same_winner': float((win[0] == win[1]).mean()), 'gap_median': float(np.median(gaps))}
+            if label:
+                # con medias iguales no hay "mejor": la referencia es el azar (1/k)
+                row['p_true_best'] = 1.0 / k
             for f, v in flags.items():
                 row[f'p_{f}'] = float(v.mean()) if n >= 3 else np.nan
-            rows.append(row)
-    return pd.DataFrame(rows)
+            rows.append({**{kk: vv for kk, vv in row.items() if kk in ('model', 'n_runs')},
+                         **{kk + label: vv for kk, vv in row.items() if kk not in ('model', 'n_runs')}})
+    out = pd.DataFrame(rows)
+    return out.groupby(['model', 'n_runs'], as_index=False).first()
 
 
 def architecture_pairs(df, n_boot):

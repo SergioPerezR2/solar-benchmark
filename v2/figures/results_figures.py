@@ -228,8 +228,11 @@ for i, m in enumerate(MODELS):
     ax.axvline(0, color='k', lw=0.6)
     for yy, (_, r) in zip(y, g.iterrows()):
         ok = r[f'equiv_d{C.TOST_DELTA:g}']
-        ax.plot([r.ci90_lo, r.ci90_hi], [yy, yy], color='#004488' if ok else '#BB5566', lw=1.4)
-        ax.plot(r.mean_diff, yy, 'o', ms=2.8, color='#004488' if ok else '#BB5566')
+        # no equivalente: color, línea discontinua y rombo abierto (no solo color)
+        ax.plot([r.ci90_lo, r.ci90_hi], [yy, yy], color='#004488' if ok else '#BB5566', lw=1.4,
+                ls='-' if ok else (0, (3, 1.5)))
+        ax.plot(r.mean_diff, yy, 'o' if ok else 'D', ms=2.8 if ok else 4.2,
+                color='#004488' if ok else '#BB5566', mfc='#004488' if ok else 'white', mew=1.1)
     ax.set_yticks(y)
     ax.set_yticklabels([f'{lab(a)} − {lab(b)}' for a, b in zip(g.A, g.B)], fontsize=6.3)
     title(ax, i, m)
@@ -245,7 +248,6 @@ x = np.arange(len(MODELS)); w = 0.11
 for k, o in enumerate(OPTS):
     ax.bar(x + (k - 3) * w, 100 * so[f'win_share_{o}'], w, color=COL[o], label=lab(o))
 ax.axhline(100 / 7, color='k', ls='--', lw=0.8)
-ax.text(-0.45, 100 / 7 + 0.6, 'chance (1/7)', fontsize=6.5, ha='left')
 ax.set_xticks(x); ax.set_xticklabels(MODELS)
 ax.set_ylabel('Times declared best (%)')
 title(ax, 0, 'Apparent winner in a single-run study')
@@ -264,7 +266,7 @@ ax.set_ylim(0, max(so.median_spread_single_run) * 1.35)
 fig.tight_layout()
 save(fig, 'f9_single_run')
 
-# ── f10: diseños de la literatura (remuestreo de n corridas por optimizador) ──
+# ── f10: diseños de la literatura (estudios emulados con semillas disjuntas) ──
 LD = os.path.join(A, 'literature_designs.csv')
 if os.path.exists(LD):
     ld = pd.read_csv(LD)
@@ -278,8 +280,11 @@ if os.path.exists(LD):
         axes[2].plot(h.n_runs, 100 * h.p_prop, 'o-', ms=3, color=MC[m], label=f'{m}')
         axes[2].plot(h.n_runs, 100 * h.p_prop_holm, 's--', ms=2.5, color=MC[m], lw=0.9)
         axes[2].plot(h.n_runs, 100 * h.p_prop_delta, '^:', ms=2.5, color=MC[m], lw=0.9)
-    axes[0].axhline(100 / 7, color='k', ls='--', lw=0.7)
-    axes[0].text(29, 100 / 7 + 2, 'chance', fontsize=6.5, ha='right')
+    # nivel esperado por azar con el mismo diseño (optimizadores intercambiables)
+    if 'p_true_best_null' in ld:
+        for ax, c in zip(axes, ('p_true_best_null', 'p_same_winner_null', 'p_prop_null')):
+            z = ld[ld.n_runs >= (3 if c == 'p_prop_null' else 1)].groupby('n_runs')[c].agg(['min', 'max'])
+            ax.fill_between(z.index, 100 * z['min'], 100 * z['max'], color='0.6', alpha=0.35, lw=0, zorder=0)
     for i, (ax, t, yl) in enumerate(zip(axes, ['Winner is the true best', 'Two studies agree on winner',
                                               'Proposed method "wins"'],
                                          ['Studies (%)'] * 3)):
