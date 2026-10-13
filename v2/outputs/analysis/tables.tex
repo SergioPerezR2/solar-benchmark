@@ -1,0 +1,132 @@
+% ===== tab:results_main =====
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Model} & \textbf{Optimizer} & \textbf{MAE} & \textbf{RMSE} & \textbf{Daytime MAE} & $\boldsymbol{S_{\mathrm{smart}}}$ \textbf{(\%)} & \textbf{Rolling MAE} \\
+\midrule
+MLP & PSO & $16.83 \pm 0.78$ & $32.95 \pm 0.80$ & $33.13 \pm 1.13$ & 15.6 & 17.52$^{(1)}$ \\
+ & GA & $17.35 \pm 1.17$ & $32.94 \pm 0.84$ & $33.34 \pm 1.52$ & 15.6 & 17.59 \\
+ & ABC & $17.00 \pm 1.23$ & $32.88 \pm 0.75$ & $33.14 \pm 1.36$ & 15.7 & 17.86$^{(1)}$ \\
+ & CMA-ES & $17.06 \pm 0.78$ & $32.67 \pm 0.62$ & $33.08 \pm 1.10$ & 16.3 & 17.35 \\
+ & TPE & $16.75 \pm 0.86$ & $32.66 \pm 0.56$ & $32.93 \pm 1.02$ & 16.3 & 16.81 \\
+ & BOHB & $\mathbf{16.64} \pm 0.85$ & $32.64 \pm 0.79$ & $32.87 \pm 1.36$ & 16.4 & 17.69 \\
+ & RS & $17.03 \pm 0.82$ & $32.79 \pm 0.75$ & $33.04 \pm 1.37$ & 16.0 & 17.84 \\
+ & Default & $35.57 \pm 5.40$ & $50.15 \pm 6.92$ & $54.42 \pm 11.28$ & -28.5 & 37.24$^{(30)}$ \\
+\midrule
+LSTM & PSO & $16.35 \pm 1.30$ & $32.28 \pm 0.71$ & $32.25 \pm 1.32$ & 17.3 & 16.67 \\
+ & GA & $16.26 \pm 0.84$ & $32.34 \pm 0.71$ & $32.48 \pm 1.21$ & 17.1 & 16.71 \\
+ & ABC & $16.52 \pm 0.96$ & $32.43 \pm 0.68$ & $32.61 \pm 1.46$ & 16.9 & 16.85 \\
+ & CMA-ES & $16.25 \pm 0.64$ & $32.11 \pm 0.59$ & $31.98 \pm 1.12$ & 17.7 & 16.58 \\
+ & TPE & $16.22 \pm 0.81$ & $32.24 \pm 0.70$ & $32.19 \pm 1.38$ & 17.4 & 16.61 \\
+ & BOHB & $\mathbf{15.99} \pm 0.76$ & $32.12 \pm 0.54$ & $31.92 \pm 1.03$ & 17.7 & 16.76 \\
+ & RS & $16.42 \pm 1.16$ & $32.37 \pm 0.99$ & $32.31 \pm 1.82$ & 17.0 & 16.64$^{(1)}$ \\
+ & Default & $22.41 \pm 3.30$ & $39.54 \pm 4.65$ & $43.82 \pm 6.35$ & -1.3 & 23.77$^{(10)}$ \\
+\midrule
+GRU & PSO & $\mathbf{16.12} \pm 0.71$ & $32.03 \pm 0.42$ & $31.59 \pm 0.89$ & 17.9 & 16.92 \\
+ & GA & $16.43 \pm 0.86$ & $32.14 \pm 0.67$ & $31.98 \pm 1.09$ & 17.6 & 17.03 \\
+ & ABC & $16.22 \pm 0.78$ & $32.07 \pm 0.79$ & $31.78 \pm 1.21$ & 17.8 & 16.91 \\
+ & CMA-ES & $16.39 \pm 0.99$ & $32.07 \pm 0.77$ & $31.81 \pm 1.38$ & 17.8 & 16.56 \\
+ & TPE & $16.21 \pm 0.44$ & $32.04 \pm 0.51$ & $31.61 \pm 0.77$ & 17.9 & 16.80 \\
+ & BOHB & $16.32 \pm 0.70$ & $32.04 \pm 0.47$ & $31.77 \pm 1.02$ & 17.9 & 16.98 \\
+ & RS & $16.18 \pm 0.70$ & $32.00 \pm 0.59$ & $31.66 \pm 1.10$ & 18.0 & 16.74 \\
+ & Default & $21.58 \pm 2.70$ & $37.17 \pm 2.86$ & $40.38 \pm 4.55$ & 4.7 & 22.13$^{(2)}$ \\
+\midrule
+\multicolumn{2}{l}{Persistence} & 75.40 & 117.25 & 151.39 & -- & -- \\
+\multicolumn{2}{l}{Smart persistence} & 18.03 & 39.02 & 38.08 & -- & -- \\
+\multicolumn{2}{l}{Symbolic (Eq.~\ref{eq:symbolic})} & 31.76 & 59.05 & 67.15 & -- & -- \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:stat_tests =====
+\begin{tabular}{lccccccccc}
+\toprule
+\textbf{Model} & $\chi^2_F$ & $p$ & \textbf{Best rank} & \textbf{Sig.} & \multicolumn{3}{c}{\textbf{Equivalent pairs}} & $\boldsymbol{\Delta_{\min}}$ & $|\hat{A}_{12}-0.5|$ \\
+\cmidrule(lr){6-8}
+ & & & & \textbf{(Holm)} & $\delta=0.5$ & $\delta=1$ & $\delta=2$ & \textbf{(median)} & \textbf{(max)} \\
+\midrule
+MLP & 16.73 & 0.010 & BOHB (3.07) & 0/21 & 5 & 20 & 21 & 0.62 & 0.20 \\
+LSTM & 7.33 & 0.292 & BOHB (3.07) & 0/21 & 5 & 21 & 21 & 0.65 & 0.18 \\
+GRU & 3.57 & 0.734 & PSO (3.60) & 0/21 & 12 & 21 & 21 & 0.46 & 0.12 \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:variance =====
+\begin{tabular}{lcc}
+\toprule
+\textbf{Term} & \textbf{Sum of squares} & $\boldsymbol{\eta^2}$ \textbf{(\%)} \\
+\midrule
+Architecture & 63.8 & 11.4 \\
+Optimizer & 8.5 & 1.5 \\
+Architecture $\times$ optimizer & 8.8 & 1.6 \\
+Seed (block) & 65.1 & 11.6 \\
+Residual & 413.7 & 73.9 \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:single_run =====
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{Best by mean} & $P(\text{best})$ & \textbf{Gap, 30 seeds} & \textbf{Gap, single run} & $P(\text{gap}>\delta)$ & $n_{\text{TOST}}$ \\
+ & & \textbf{(\%)} & \textbf{(W/m$^2$)} & \textbf{(median, W/m$^2$)} & \textbf{(\%)} & \textbf{(median)} \\
+\midrule
+MLP & BOHB & 23.1 & 0.71 & 2.41 & 98.5 & 13 \\
+LSTM & BOHB & 20.3 & 0.53 & 2.31 & 98.2 & 14 \\
+GRU & PSO & 19.5 & 0.31 & 1.95 & 95.2 & 7 \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:low_budget =====
+\begin{tabular}{lccccccccc}
+\toprule
+ & \multicolumn{3}{c}{\textbf{MLP}} & \multicolumn{3}{c}{\textbf{LSTM}} & \multicolumn{3}{c}{\textbf{GRU}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+$b$ & \textbf{Range} & \textbf{Sig.} & \textbf{Eq.} & \textbf{Range} & \textbf{Sig.} & \textbf{Eq.} & \textbf{Range} & \textbf{Sig.} & \textbf{Eq.} \\
+\midrule
+10 & 17.46--22.15 & 6 & 2 & 16.40--16.83 & 0 & 21 & 16.53--17.24 & 1 & 17 \\
+25 & 17.25--18.82 & 2 & 4 & 16.33--16.59 & 0 & 21 & 16.17--16.79 & 0 & 20 \\
+50 & 16.91--17.74 & 0 & 17 & 16.11--16.54 & 0 & 21 & 16.10--16.55 & 0 & 21 \\
+100 & 16.64--17.35 & 0 & 20 & 15.99--16.52 & 0 & 21 & 16.12--16.43 & 0 & 21 \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:popsens =====
+\begin{tabular}{lccc}
+\toprule
+\textbf{Optimizer} & $n=5$ & $n=10$ & $n=20$ \\
+\midrule
+PSO & $16.92 \pm 1.11$ & -- & $17.05 \pm 1.03$ \\
+GA & $17.95 \pm 1.91$ & -- & $17.36 \pm 1.02$ \\
+ABC & $18.37 \pm 2.70$ & -- & $17.12 \pm 0.88$ \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:opt_time =====
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Model} & \textbf{PSO} & \textbf{GA} & \textbf{ABC} & \textbf{CMA-ES} & \textbf{TPE} & \textbf{BOHB} & \textbf{RS} \\
+\midrule
+MLP & 32 & 28 & 27 & 34 & 30 & 52 & 29 \\
+LSTM & 61 & 70 & 61 & 62 & 78 & 83 & 68 \\
+GRU & 62 & 62 & 57 & 50 & 52 & 68 & 46 \\
+\midrule
+MLP (epochs) & 916 & 931 & 885 & 886 & 912 & 1004 & 814 \\
+LSTM (epochs) & 926 & 941 & 941 & 954 & 935 & 1004 & 913 \\
+GRU (epochs) & 888 & 890 & 874 & 886 & 873 & 1003 & 844 \\
+\bottomrule
+\end{tabular}
+
+% ===== tab:architectures =====
+\begin{tabular}{lccc}
+\toprule
+\textbf{Optimizer} & \textbf{LSTM $-$ MLP} & \textbf{GRU $-$ MLP} & \textbf{LSTM $-$ GRU} \\
+\midrule
+PSO & $-0.48$ [$-0.89$, $0.29$]$^{*}$ & $-0.71$ [$-1.08$, $-0.32$]$^{*}$ & $0.23$ [$-0.22$, $0.99$] \\
+GA & $-1.09$ [$-1.64$, $-0.63$]$^{*}$ & $-0.92$ [$-1.33$, $-0.49$]$^{*}$ & $-0.17$ [$-0.56$, $0.19$] \\
+ABC & $-0.48$ [$-0.97$, $0.02$] & $-0.78$ [$-1.33$, $-0.30$]$^{*}$ & $0.31$ [$-0.18$, $0.74$] \\
+CMA-ES & $-0.81$ [$-1.15$, $-0.39$]$^{*}$ & $-0.67$ [$-1.05$, $-0.23$]$^{*}$ & $-0.14$ [$-0.57$, $0.23$] \\
+TPE & $-0.53$ [$-0.96$, $-0.12$] & $-0.54$ [$-0.93$, $-0.25$]$^{*}$ & $0.01$ [$-0.31$, $0.31$] \\
+BOHB & $-0.65$ [$-0.98$, $-0.39$]$^{*}$ & $-0.32$ [$-0.72$, $0.04$] & $-0.32$ [$-0.65$, $0.02$] \\
+RS & $-0.61$ [$-1.06$, $-0.16$]$^{*}$ & $-0.85$ [$-1.12$, $-0.58$]$^{*}$ & $0.23$ [$-0.26$, $0.73$] \\
+Default & $-13.16$ [$-15.03$, $-10.97$]$^{*}$ & $-13.99$ [$-15.76$, $-11.73$]$^{*}$ & $0.83$ [$-0.19$, $1.66$] \\
+\bottomrule
+\end{tabular}
+

@@ -37,3 +37,10 @@ build/
 # Logs de ejecución de benchmark
 benchmark.log
 mlflow_ui.log
+
+# v2: se versionan los datos preprocesados y los resultados finales
+!v2/outputs/
+v2/outputs/*
+!v2/outputs/data/
+!v2/outputs/results/
+!v2/outputs/analysis/
