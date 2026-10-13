@@ -55,7 +55,6 @@ for ax, w, col, title in ((ax1, clear, '#EE7733', '(a) Clear-sky week (Apr 2021)
     ax.set_ylim(0, 1250)
 ax1.set_ylabel('GHI (W/m²)', fontsize=8.5)
 ax2.tick_params(labelleft=False)
-ax1.legend(fontsize=7, frameon=False, loc='upper right')
 
 ax3.axvspan(t_first - pd.Timedelta(minutes=30), t_last + pd.Timedelta(minutes=30),
             alpha=0.12, color='#CC3311', zorder=0)
@@ -63,11 +62,6 @@ ax3.plot(zoom.index, zoom.GHI_cs, color='0.45', lw=0.8, ls='--')
 ax3.fill_between(zoom.index, zoom.GHI, alpha=0.18, color='#009988')
 ax3.plot(zoom.index, zoom.GHI, color='#009988', lw=1.1, marker='o', ms=2)
 ax3.plot([t_pred], [s.loc[t_pred, 'GHI']], marker='*', ms=11, color='#CC3311', zorder=4)
-ax3.annotate('input window: 24 h ($t-24 \\ldots t-1$)', xy=(t_first + pd.Timedelta(hours=12), 1130),
-             ha='center', fontsize=7.5, color='#CC3311')
-ax3.annotate('target $t$\n(+1 h)', xy=(t_pred, s.loc[t_pred, 'GHI']),
-             xytext=(t_pred + pd.Timedelta(hours=3), 1000), fontsize=7.5, color='#CC3311',
-             arrowprops=dict(arrowstyle='->', color='#CC3311', lw=0.8))
 ax3.set_title('(c) 48-hour detail: input window and forecast target', fontsize=8.5, fontweight='bold')
 ax3.xaxis.set_major_locator(mdates.HourLocator(byhour=[0, 6, 12, 18]))
 ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b %d %H:%M'))
@@ -76,6 +70,12 @@ ax3.set_ylabel('GHI (W/m²)', fontsize=8.5)
 ax3.set_xlabel('Local time (CST, UTC$-$6)', fontsize=8)
 ax3.set_ylim(0, 1250)
 
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+fig.legend([Line2D([], [], color='0.25', lw=1.1), Line2D([], [], color='0.45', lw=0.8, ls='--'),
+            Patch(facecolor='#CC3311', alpha=0.12), Line2D([], [], color='#CC3311', marker='*', ms=9, ls='none')],
+           ['GHI', 'Clear-sky GHI', 'Input window (24 h)', 'Forecast target $t$'],
+           loc='lower center', ncol=4, frameon=False, fontsize=7.5, bbox_to_anchor=(0.5, 0.955))
 os.makedirs(OUT, exist_ok=True)
 for ext in ('pdf', 'png'):
     fig.savefig(os.path.join(OUT, f'i1_ghi_timeseries.{ext}'), dpi=300, bbox_inches='tight')
