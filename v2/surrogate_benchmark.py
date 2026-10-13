@@ -185,6 +185,65 @@ def replay(seeds=range(30)):
     return rep, float(np.mean(times))
 
 
+def run_new_optimizer(optimizer, model, seed, budget=C.BUDGET):
+    """Ejecuta un optimizador externo sobre el sustituto y devuelve su mejor MAE tras
+    10, 25, 50 y 100 evaluaciones.
+
+    `optimizer(objective, budget, seed)` debe llamar a `objective(u)` con vectores
+    u ∈ [0,1]^5 (se decodifican con hpo.decode) y devolver cuando termine o cuando
+    `objective` lance hpo.BudgetExhausted. Se usa la misma semilla de ruido que en la
+    réplica de los optimizadores del artículo, de modo que la comparación es pareada.
+    """
+    f = SurrogateObjective(model, seed=10_000 + seed)
+    hist = []
+
+    def objective(u):
+        if len(hist) >= budget:
+            raise hpo.BudgetExhausted
+        v = f(np.asarray(u, dtype=float))
+        hist.append(min(v, hist[-1]) if hist else v)
+        return v
+
+    try:
+        optimizer(objective, budget, seed)
+    except hpo.BudgetExhausted:
+        pass
+    if len(hist) < budget:
+        raise ValueError(f'el optimizador usó {len(hist)} de {budget} evaluaciones')
+    return {b: hist[b - 1] for b in (10, 25, 50, 100)}
+
+
+def compare_new_optimizer(optimizer, name='NEW', models=C.MODELS, seeds=range(30), delta=C.TOST_DELTA,
+                          n_boot=2000):
+    """Compara un optimizador nuevo con los seis del artículo sobre el sustituto.
+
+    Devuelve, para cada arquitectura y presupuesto, la media del mejor MAE de
+    validación de cada método y, para el método nuevo frente a cada referencia, la
+    diferencia media pareada por semilla, su intervalo bootstrap del 90 % y si es
+    equivalente dentro de ±delta W/m² (TOST, como en el artículo).
+    """
+    ref = pd.read_csv(os.path.join(OUT, 'replay_runs.csv'))
+    rows, summary = [], []
+    for m in models:
+        new = pd.DataFrame([{'seed': s, 'eval': b, 'best_so_far': v}
+                            for s in seeds for b, v in run_new_optimizer(optimizer, m, s).items()])
+        for b in (10, 25, 50, 100):
+            x = new[new['eval'] == b].set_index('seed').best_so_far
+            summary.append({'model': m, 'eval': b, 'optimizer': name, 'mean_best': x.mean()})
+            r = ref[(ref.model == m) & (ref['eval'] == b) & ref.seed.isin(list(seeds))]
+            for o, g in r.groupby('optimizer'):
+                y = g.set_index('seed').best_so_far.reindex(x.index)
+                summary.append({'model': m, 'eval': b, 'optimizer': o, 'mean_best': y.mean()})
+                d = (x - y).to_numpy()
+                ci = stats.bootstrap((d,), np.mean, confidence_level=0.90, n_resamples=n_boot,
+                                     method='percentile', random_state=0).confidence_interval
+                rows.append({'model': m, 'eval': b, 'vs': o, 'mean_diff': d.mean(),
+                             'ci90_lo': ci.low, 'ci90_hi': ci.high,
+                             'better': bool(ci.high < 0), 'worse': bool(ci.low > 0),
+                             f'equivalent_d{delta:g}': bool(-delta < ci.low and ci.high < delta)})
+    return pd.DataFrame(summary).drop_duplicates(), pd.DataFrame(rows)
+
+
 def compare(rep):
     """Compara la réplica con el experimento real (mejor MAE de validación hasta b)."""
     real = []
