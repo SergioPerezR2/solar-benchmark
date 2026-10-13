@@ -14,6 +14,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config as C  # noqa: E402
@@ -293,6 +294,63 @@ N['best_run'] = f"{best.run}: {best.all_mae:.2f}"
 N['n_runs'] = runs[runs.budget == 'B100'].groupby('tag').size().to_dict()
 pd_ = runs[(runs.tag == 'popsens') & (runs.budget == 'B100')]
 N['popsens_n'] = len(pd_)
+
+# ── Diseños de la literatura ──────────────────────────────────────────────────
+LD = os.path.join(A, 'literature_designs.csv')
+if os.path.exists(LD):
+    ld = rd('literature_designs.csv')
+    rg = lambda c, n: (100 * ld[ld.n_runs == n][c].min(), 100 * ld[ld.n_runs == n][c].max())
+    def fmt(c, n):
+        lo_, hi_ = rg(c, n)
+        if np.isnan(lo_):
+            return '--'
+        return f'{lo_:.0f}' if round(lo_) == round(hi_) else f'{lo_:.0f}--{hi_:.0f}'
+    lines = [r'\begin{tabular}{cccccc}', r'\toprule',
+             r'$\boldsymbol{n}$ & \textbf{Winner is} & \textbf{Same winner} & \multicolumn{3}{c}{\textbf{Proposed method significantly better than a rival}} \\',
+             r'\cmidrule(lr){4-6}',
+             r' & \textbf{true best} & \textbf{in replication} & \textbf{Uncorrected} & \textbf{Holm} & \textbf{Uncorrected, gap $>\delta$} \\', r'\midrule']
+    for n in sorted(ld.n_runs.unique()):
+        lines.append(f"{n} & {fmt('p_true_best', n)} & {fmt('p_same_winner', n)} & {fmt('p_prop', n)} & "
+                     f"{fmt('p_prop_holm', n)} & {fmt('p_prop_delta', n)} \\\\")
+        for c in ('p_true_best', 'p_same_winner', 'p_prop', 'p_prop_holm', 'p_prop_delta', 'p_any_sig', 'p_any_sig_holm'):
+            lo_, hi_ = rg(c, n)
+            if not np.isnan(lo_):
+                N[f'lit_n{n}_{c}'] = [round(float(lo_), 1), round(float(hi_), 1)]
+    lines += [r'\bottomrule', r'\end{tabular}']
+    out.append(('tab:lit_designs', '\n'.join(lines)))
+
+# ── Benchmark sustituto ───────────────────────────────────────────────────────
+SD = os.path.join(A, '..', 'surrogate')
+if os.path.exists(os.path.join(SD, 'fidelity.csv')):
+    fi = pd.read_csv(os.path.join(SD, 'fidelity.csv')).set_index('model')
+    cmp_ = pd.read_csv(os.path.join(SD, 'replay_vs_real.csv'))
+    meta = json.load(open(os.path.join(SD, 'replay_meta.json')))
+    import joblib
+    lines = [r'\begin{tabular}{lccccccc}', r'\toprule',
+             r'\textbf{Model} & \textbf{Evaluations} & \textbf{Spearman} & $\boldsymbol{R^2}$ & $\boldsymbol{\kappa}$ & '
+             r'\textbf{Diff.} & $\boldsymbol{\rho}$ & \textbf{Last} \\',
+             r' & & \textbf{(held-out seeds)} & & & \textbf{(W/m$^2$)} & \textbf{(ranking)} & \textbf{(real / surr.)} \\', r'\midrule']
+    for m in MODELS:
+        kap = joblib.load(os.path.join(SD, f'{m}.joblib')).get('kappa', np.nan)
+        g = cmp_[(cmp_.model == m) & (cmp_['eval'] == 100)]
+        gv = g[g.optimizer != 'RS']
+        diff = float((gv.real - gv.surrogate).abs().mean())
+        rho = stats.spearmanr(g.real, g.surrogate)[0]
+        last_r, last_s = g.loc[g.real.idxmax(), 'optimizer'], g.loc[g.surrogate.idxmax(), 'optimizer']
+        lines.append(f"{m} & {int(fi.loc[m, 'n_evals']):,} & {fi.loc[m, 'spearman']:.2f} & {fi.loc[m, 'r2']:.2f} & "
+                     f"{kap:.2f} & {diff:.2f} & {rho:.2f} & {lab(last_r)} / {lab(last_s)} \\\\".replace(',', '{,}'))
+        N[f'sur_{m}'] = {'n': int(fi.loc[m, 'n_evals']), 'spearman': round(float(fi.loc[m, 'spearman']), 2),
+                         'r2': round(float(fi.loc[m, 'r2']), 2), 'kappa': round(float(kap), 2),
+                         'diff_b100_nonRS': round(diff, 2), 'rho_b100': round(float(rho), 2),
+                         'last_real': last_r, 'last_sur': last_s}
+    gv = cmp_[cmp_.optimizer != 'RS']
+    N['sur_diff_all_nonRS'] = round(float((gv.real - gv.surrogate).abs().mean()), 2)
+    N['sur_diff_max_nonRS'] = round(float((gv.real - gv.surrogate).abs().max()), 2)
+    N['sur_spearman_all'] = round(float(meta['spearman_all']), 2)
+    N['sur_seconds_per_run'] = round(float(meta['seconds_per_run']), 2)
+    N['sur_n_evals_total'] = int(fi.n_evals.sum())
+    lines += [r'\bottomrule', r'\end{tabular}']
+    out.append(('tab:surrogate', '\n'.join(lines)))
 
 with open(os.path.join(A, 'tables.tex'), 'w') as f:
     for k, t in out:

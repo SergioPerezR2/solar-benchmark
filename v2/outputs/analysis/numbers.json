@@ -242,38 +242,47 @@
  "GRU_B100_sig_list": [],
  "pop_PSO": {
   "5": 16.92,
+  "10": 16.83,
   "20": 17.05
  },
  "pop_PSO_sd": {
   "5": 1.11,
+  "10": 0.78,
   "20": 1.03
  },
  "pop_PSO_n": {
   "5": 30,
+  "10": 30,
   "20": 30
  },
  "pop_GA": {
   "5": 17.95,
+  "10": 17.35,
   "20": 17.36
  },
  "pop_GA_sd": {
   "5": 1.91,
+  "10": 1.17,
   "20": 1.02
  },
  "pop_GA_n": {
   "5": 30,
+  "10": 30,
   "20": 30
  },
  "pop_ABC": {
   "5": 18.37,
+  "10": 17.0,
   "20": 17.12
  },
  "pop_ABC_sd": {
   "5": 2.7,
+  "10": 1.23,
   "20": 0.88
  },
  "pop_ABC_n": {
   "5": 30,
+  "10": 30,
   "20": 30
  },
  "MLP_hpo_min": {
@@ -800,5 +809,216 @@
   "core": 720,
   "popsens": 180
  },
- "popsens_n": 180
+ "popsens_n": 180,
+ "lit_n1_p_true_best": [
+  18.6,
+  22.3
+ ],
+ "lit_n1_p_same_winner": [
+  14.5,
+  16.2
+ ],
+ "lit_n3_p_true_best": [
+  21.9,
+  30.8
+ ],
+ "lit_n3_p_same_winner": [
+  15.2,
+  18.4
+ ],
+ "lit_n3_p_prop": [
+  0.0,
+  0.0
+ ],
+ "lit_n3_p_prop_holm": [
+  0.0,
+  0.0
+ ],
+ "lit_n3_p_prop_delta": [
+  0.0,
+  0.0
+ ],
+ "lit_n3_p_any_sig": [
+  0.0,
+  0.1
+ ],
+ "lit_n3_p_any_sig_holm": [
+  0.0,
+  0.0
+ ],
+ "lit_n5_p_true_best": [
+  25.9,
+  35.7
+ ],
+ "lit_n5_p_same_winner": [
+  17.1,
+  21.8
+ ],
+ "lit_n5_p_prop": [
+  10.6,
+  13.5
+ ],
+ "lit_n5_p_prop_holm": [
+  0.0,
+  0.0
+ ],
+ "lit_n5_p_prop_delta": [
+  5.9,
+  10.5
+ ],
+ "lit_n5_p_any_sig": [
+  42.4,
+  51.4
+ ],
+ "lit_n5_p_any_sig_holm": [
+  0.0,
+  0.0
+ ],
+ "lit_n10_p_true_best": [
+  30.9,
+  48.1
+ ],
+ "lit_n10_p_same_winner": [
+  18.2,
+  28.2
+ ],
+ "lit_n10_p_prop": [
+  15.7,
+  22.5
+ ],
+ "lit_n10_p_prop_holm": [
+  0.8,
+  2.1
+ ],
+ "lit_n10_p_prop_delta": [
+  2.4,
+  10.7
+ ],
+ "lit_n10_p_any_sig": [
+  56.8,
+  71.2
+ ],
+ "lit_n10_p_any_sig_holm": [
+  5.4,
+  10.7
+ ],
+ "lit_n15_p_true_best": [
+  33.0,
+  52.9
+ ],
+ "lit_n15_p_same_winner": [
+  21.6,
+  33.7
+ ],
+ "lit_n15_p_prop": [
+  18.6,
+  28.6
+ ],
+ "lit_n15_p_prop_holm": [
+  2.1,
+  4.3
+ ],
+ "lit_n15_p_prop_delta": [
+  0.5,
+  8.9
+ ],
+ "lit_n15_p_any_sig": [
+  63.8,
+  83.7
+ ],
+ "lit_n15_p_any_sig_holm": [
+  9.1,
+  23.0
+ ],
+ "lit_n20_p_true_best": [
+  37.1,
+  62.3
+ ],
+ "lit_n20_p_same_winner": [
+  23.6,
+  41.0
+ ],
+ "lit_n20_p_prop": [
+  23.4,
+  34.5
+ ],
+ "lit_n20_p_prop_holm": [
+  2.4,
+  8.3
+ ],
+ "lit_n20_p_prop_delta": [
+  0.1,
+  5.8
+ ],
+ "lit_n20_p_any_sig": [
+  72.1,
+  90.7
+ ],
+ "lit_n20_p_any_sig_holm": [
+  13.5,
+  36.3
+ ],
+ "lit_n30_p_true_best": [
+  43.5,
+  72.5
+ ],
+ "lit_n30_p_same_winner": [
+  26.7,
+  54.6
+ ],
+ "lit_n30_p_prop": [
+  26.1,
+  43.8
+ ],
+ "lit_n30_p_prop_holm": [
+  4.3,
+  13.9
+ ],
+ "lit_n30_p_prop_delta": [
+  0.0,
+  3.1
+ ],
+ "lit_n30_p_any_sig": [
+  79.7,
+  96.5
+ ],
+ "lit_n30_p_any_sig_holm": [
+  21.0,
+  56.5
+ ],
+ "sur_MLP": {
+  "n": 19632,
+  "spearman": 0.85,
+  "r2": 0.77,
+  "kappa": 0.48,
+  "diff_b100_nonRS": 0.58,
+  "rho_b100": 0.94,
+  "last_real": "RS",
+  "last_sur": "RS"
+ },
+ "sur_LSTM": {
+  "n": 19670,
+  "spearman": 0.69,
+  "r2": 0.56,
+  "kappa": 0.38,
+  "diff_b100_nonRS": 0.19,
+  "rho_b100": 0.6,
+  "last_real": "RS",
+  "last_sur": "RS"
+ },
+ "sur_GRU": {
+  "n": 19849,
+  "spearman": 0.62,
+  "r2": 0.68,
+  "kappa": 0.45,
+  "diff_b100_nonRS": 0.19,
+  "rho_b100": 0.94,
+  "last_real": "RS",
+  "last_sur": "RS"
+ },
+ "sur_diff_all_nonRS": 0.25,
+ "sur_diff_max_nonRS": 1.03,
+ "sur_spearman_all": 0.96,
+ "sur_seconds_per_run": 0.2,
+ "sur_n_evals_total": 59151
 }

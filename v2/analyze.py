@@ -255,6 +255,65 @@ def single_run_reliability(df, n_mc=20000, seed=0):
     return pd.DataFrame(pairs), pd.DataFrame(overall)
 
 
+def literature_designs(df, sizes=(1, 3, 5, 10, 15, 20, 30), n_rep=2000, seed=1):
+    """Emula estudios con n corridas independientes por optimizador.
+
+    Cada estudio remuestrea (con reemplazo) n semillas para cada optimizador de
+    forma independiente, como en la literatura, y se estima:
+      - p_true_best: el optimizador con menor media es el mejor por media de 30 semillas;
+      - p_same_winner: dos estudios independientes del mismo diseño eligen el mismo ganador;
+      - gap_median: brecha aparente mejor–peor (W/m²);
+      - p_any_sig: al menos un par difiere (Mann–Whitney, α = 0.05, sin corrección);
+      - p_proposal_wins: un optimizador elegido de antemano resulta significativamente
+        mejor que al menos uno de los otros seis (lo que reportaría quien lo "propone").
+    """
+    core = df[(df.tag == 'core') & (df.budget == FULL) & (df.optimizer != 'DEFAULT')]
+    rng = np.random.default_rng(seed)
+    rows = []
+    for m, sub in core.groupby('model'):
+        X = complete_blocks(sub, OPT_ORDER, 'all_mae').to_numpy()       # semillas x optimizadores
+        n_s, k = X.shape
+        best = int(np.argmin(X.mean(axis=0)))
+        for n in sizes:
+            win = np.empty((2, n_rep), int); gaps = np.empty(n_rep)
+            flags = {f: np.zeros(n_rep, bool) for f in ('any_sig', 'any_sig_holm', 'prop', 'prop_holm', 'prop_delta')}
+            pairs = list(combinations(range(k), 2))
+            for t in range(2):
+                for r in range(n_rep):
+                    S = X[rng.integers(0, n_s, size=(n, k)), np.arange(k)]   # n x k
+                    mu = S.mean(axis=0)
+                    win[t, r] = int(np.argmin(mu))
+                    if t or n < 3:
+                        continue
+                    gaps[r] = mu.max() - mu.min()
+                    p_star = rng.integers(k)
+                    pv = np.array([stats.mannwhitneyu(S[:, a], S[:, b], alternative='two-sided').pvalue
+                                   for a, b in pairs])
+                    ph = holm(pv)
+                    for (a, b), p, q in zip(pairs, pv, ph):
+                        other = b if p_star == a else a
+                        mine = p_star in (a, b) and mu[p_star] < mu[other]
+                        if p < C.ALPHA:
+                            flags['any_sig'][r] = True
+                            if mine:
+                                flags['prop'][r] = True
+                                if mu[other] - mu[p_star] > C.TOST_DELTA:
+                                    flags['prop_delta'][r] = True
+                        if q < C.ALPHA:
+                            flags['any_sig_holm'][r] = True
+                            if mine:
+                                flags['prop_holm'][r] = True
+            if n < 3:
+                gaps = np.array([np.ptp(X[rng.integers(0, n_s, size=(n, k)), np.arange(k)].mean(axis=0))
+                                 for _ in range(n_rep)])
+            row = {'model': m, 'n_runs': n, 'p_true_best': float((win[0] == best).mean()),
+                   'p_same_winner': float((win[0] == win[1]).mean()), 'gap_median': float(np.median(gaps))}
+            for f, v in flags.items():
+                row[f'p_{f}'] = float(v.mean()) if n >= 3 else np.nan
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def architecture_pairs(df, n_boot):
     """Comparación directa de arquitecturas para cada optimizador, pareada por
     semilla (misma semilla => misma aleatoriedad del optimizador y del
@@ -423,6 +482,7 @@ def main():
     tables['anytime_by_eval'], tables['anytime_by_epoch'] = anytime_curves(hist)
     tables['hp_importance_rs'] = hp_importance(hist)
     tables['single_run_pairs'], tables['single_run_overall'] = single_run_reliability(df)
+    tables['literature_designs'] = literature_designs(df)
 
     for name, t in tables.items():
         t.to_csv(os.path.join(OUT, f'{name}.csv'), index=False)

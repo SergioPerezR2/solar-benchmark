@@ -33,6 +33,7 @@ v2/
   normalize_results.py       Consistency pass over the result files
   analyze.py                 Statistical analysis -> outputs/analysis/*.csv
   symbolic_refit.py          Re-fit and bootstrap of the symbolic reference equation
+  surrogate_benchmark.py     Surrogate benchmark fitted to all evaluations (see below)
   figures/                   Scripts for all figures (results_figures.py, f6, i1, i2)
                              and for all tables and numbers in the text (results_tables.py)
   outputs/
@@ -40,6 +41,7 @@ v2/
     results/core/            720 runs: <MODEL>_<OPTIMIZER>_s<SEED>.json and .npz
     results/popsens/         180 population-size sensitivity runs
     analysis/                Analysis tables (CSV), tables.tex, and numbers.json
+    surrogate/               Surrogate models, fidelity, and replay of the optimizers
 ```
 
 Each result file `*.json` contains the configuration, the full evaluation history (candidate, validation MAE, epochs, and time of every evaluation), the incumbents and test metrics at b = 10, 25, 50, and 100, and the rolling-origin results. The matching `*.npz` file contains the test-set predictions.
@@ -71,6 +73,20 @@ Each result file `*.json` contains the configuration, the full evaluation histor
    python figures/results_figures.py
    python figures/f6_anytime_convergence.py
    ```
+
+### Surrogate benchmark
+
+`v2/surrogate_benchmark.py` fits, for each architecture, a regression model to the 59,151 completed evaluations of the experiment and emulates training noise (an offset per run plus noise per evaluation, calibrated with Random Search). It reproduces the behaviour of the optimizers within a few tenths of W/m² (see `outputs/surrogate/`), and a run of 100 evaluations takes a fraction of a second. To test a new optimizer:
+
+```python
+import numpy as np
+from surrogate_benchmark import SurrogateObjective
+
+f = SurrogateObjective('LSTM', seed=0)        # f(u) -> validation MAE (W/m2), u in [0, 1]^5
+best = min(f(np.random.default_rng(0).random(5)) for _ in range(100))   # e.g. random search
+```
+
+Any optimizer in `hpo.py` can be run on the surrogate in the same way as in the experiment (`python surrogate_benchmark.py` repeats the comparison). The surrogate is intended for screening and method development; final conclusions should be confirmed with real training.
 
 ## License
 

@@ -44,3 +44,4 @@ v2/outputs/*
 !v2/outputs/data/
 !v2/outputs/results/
 !v2/outputs/analysis/
+!v2/outputs/surrogate/

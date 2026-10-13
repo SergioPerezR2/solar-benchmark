@@ -242,3 +242,72 @@ ax.legend(fontsize=7, frameon=False, loc='upper left')
 ax.set_ylim(0, max(so.median_spread_single_run) * 1.35)
 fig.tight_layout()
 save(fig, 'f9_single_run')
+
+# ── f10: diseños de la literatura (remuestreo de n corridas por optimizador) ──
+LD = os.path.join(A, 'literature_designs.csv')
+if os.path.exists(LD):
+    ld = pd.read_csv(LD)
+    MC = {'MLP': '#BB5566', 'LSTM': '#004488', 'GRU': '#DDAA33'}
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.6))
+    for m in MODELS:
+        g = ld[ld.model == m].sort_values('n_runs')
+        axes[0].plot(g.n_runs, 100 * g.p_true_best, 'o-', ms=3, color=MC[m], label=m)
+        axes[1].plot(g.n_runs, 100 * g.p_same_winner, 'o-', ms=3, color=MC[m], label=m)
+        h = g[g.n_runs >= 3]
+        axes[2].plot(h.n_runs, 100 * h.p_prop, 'o-', ms=3, color=MC[m], label=f'{m}')
+        axes[2].plot(h.n_runs, 100 * h.p_prop_holm, 's--', ms=2.5, color=MC[m], lw=0.9)
+        axes[2].plot(h.n_runs, 100 * h.p_prop_delta, '^:', ms=2.5, color=MC[m], lw=0.9)
+    axes[0].axhline(100 / 7, color='k', ls='--', lw=0.7)
+    axes[0].text(29, 100 / 7 + 2, 'chance', fontsize=6.5, ha='right')
+    for i, (ax, t, yl) in enumerate(zip(axes, ['Winner is the true best', 'Two studies agree on winner',
+                                              'Proposed method "wins"'],
+                                         ['Studies (%)'] * 3)):
+        title(ax, i, t)
+        ax.set_xlabel('Runs per optimizer ($n$)')
+        ax.set_ylim(0, 100)
+        ax.grid(alpha=0.25, lw=0.5)
+    axes[0].set_ylabel('Studies (%)')
+    axes[0].legend(fontsize=7, frameon=False, loc='upper left')
+    from matplotlib.lines import Line2D
+    axes[2].legend([Line2D([], [], color='0.3', ls='-', marker='o', ms=3),
+                    Line2D([], [], color='0.3', ls='--', marker='s', ms=2.5),
+                    Line2D([], [], color='0.3', ls=':', marker='^', ms=2.5)],
+                   ['uncorrected', 'Holm', 'uncorrected, gap > $\\delta$'], fontsize=6.3, frameon=False,
+                   loc='upper left')
+    fig.tight_layout()
+    save(fig, 'f10_literature_designs')
+
+# ── f11: fidelidad del benchmark sustituto ───────────────────────────────────
+SR = os.path.join(A, '..', 'surrogate', 'replay_vs_real.csv')
+if os.path.exists(SR):
+    sr = pd.read_csv(SR)
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.0))
+    ax = axes[0]
+    mk = {10: 'o', 25: 's', 50: '^', 100: 'D'}
+    for b, g in sr.groupby('eval'):
+        for o in [o for o in OPTS if o in set(sr.optimizer)]:
+            h = g[g.optimizer == o]
+            ax.scatter(h.real, h.surrogate, s=14, marker=mk[b], color=COL[o], lw=0,
+                       label=lab(o) if b == 100 else None)
+    lo, hi = sr[['real', 'surrogate']].min().min() - 0.3, sr[['real', 'surrogate']].max().max() + 0.3
+    ax.plot([lo, hi], [lo, hi], 'k--', lw=0.7)
+    ax.set_xlabel('Experiment: best validation MAE (W/m²)')
+    ax.set_ylabel('Surrogate: best validation MAE (W/m²)')
+    title(ax, 0, 'Replay at $b$ = 10, 25, 50, 100')
+    ax.legend(fontsize=6.5, frameon=False, ncol=2, loc='upper left', markerscale=1.2)
+    ax.grid(alpha=0.25, lw=0.5)
+    ax = axes[1]
+    g = sr[sr['eval'] == 100]
+    x = np.arange(len(MODELS)); w = 0.12
+    for k, o in enumerate([o for o in OPTS if o in set(g.optimizer)]):
+        h = g[g.optimizer == o].set_index('model').reindex(MODELS)
+        xs = x + (k - 2.5) * w
+        ax.scatter(xs, h.real, color=COL[o], s=16, zorder=3)
+        ax.scatter(xs, h.surrogate, facecolor='white', edgecolor=COL[o], s=16, zorder=3)
+        ax.vlines(xs, h.real, h.surrogate, color=COL[o], lw=0.8)
+    ax.set_xticks(x); ax.set_xticklabels(MODELS)
+    ax.set_ylabel('Best validation MAE at $b$ = 100 (W/m²)')
+    title(ax, 1, 'Experiment (filled) vs. surrogate (open)')
+    ax.grid(axis='y', alpha=0.25, lw=0.5)
+    fig.tight_layout()
+    save(fig, 'f11_surrogate')
