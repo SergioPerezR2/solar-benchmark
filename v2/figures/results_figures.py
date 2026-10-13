@@ -78,29 +78,50 @@ for i, m in enumerate(MODELS):
 axes[0].set_ylabel('Test MAE, all hours (W/m²)')
 save(fig, 'f1_test_mae_distribution')
 
-# ── f2: ajustados vs. por defecto vs. referencias ─────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.9))
+# ── f2: ajustados vs. por defecto vs. referencias (eje partido) ──────────────
+MK = {'PSO': 'o', 'GA': 's', 'ABC': '^', 'CMAES': 'D', 'TPE': 'v', 'BOHB': 'P', 'RS': 'X', 'DEFAULT': 'o'}
+fig = plt.figure(figsize=(7.2, 3.6))
+gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.5], hspace=0.08, wspace=0.28)
 for i, (col, blk, name) in enumerate((('all_mae', 'all', 'All hours'),
                                       ('day_ghi50_mae', 'day_ghi50', 'Daytime (GHI > 50 W/m²)'))):
-    ax = axes[i]
+    top, bot = fig.add_subplot(gs[0, i]), fig.add_subplot(gs[1, i])
+    sp = refs.query(f"reference=='smart_persistence' and split=='test' and block=='{blk}'").mae.iloc[0]
     x = np.arange(len(MODELS)); w = 0.1
+    tuned_hi, def_lo, def_hi = 0, 1e9, 0
     for k, o in enumerate(OPTS + ['DEFAULT']):
         g = b100[b100.optimizer == o].groupby('model')[col].agg(['mean', 'std']).reindex(MODELS)
-        ax.bar(x + (k - 3.5) * w, g['mean'], w, yerr=g['std'], color=COL[o], label=lab(o),
-               error_kw={'lw': 0.6, 'capsize': 1.2})
-    for ref, ls in (('persistence', ':'), ('smart_persistence', '--')):
-        v = refs.query(f"reference=='{ref}' and split=='test' and block=='{blk}'").mae.iloc[0]
-        ax.axhline(v, color='k', ls=ls, lw=0.9, label=ref.replace('_', ' ').capitalize())
-    ax.set_xticks(x); ax.set_xticklabels(MODELS)
-    ax.set_ylabel('Test MAE (W/m²)')
-    title(ax, i, name)
-    ax.grid(axis='y', alpha=0.25, lw=0.5)
-h, l = axes[0].get_legend_handles_labels()
-fig.legend(h, l, loc='lower center', ncol=5, frameon=False, fontsize=7, bbox_to_anchor=(0.5, -0.13))
+        xs = x + (k - 3.5) * w
+        ax = top if o == 'DEFAULT' else bot
+        ax.errorbar(x if o == 'DEFAULT' else xs, g['mean'], yerr=g['std'], fmt=MK[o], ms=4 if o != 'DEFAULT' else 5,
+                    color=COL[o] if o != 'DEFAULT' else '0.35', mfc=COL[o] if o != 'DEFAULT' else 'white',
+                    lw=0.9, capsize=1.5, label=lab(o))
+        if o == 'DEFAULT':
+            def_lo, def_hi = (g['mean'] - g['std']).min(), (g['mean'] + g['std']).max()
+        else:
+            tuned_hi = max(tuned_hi, (g['mean'] + g['std']).max())
+    lo_b = b100[b100.optimizer != 'DEFAULT'].groupby('model')[col].agg(['mean', 'std'])
+    bot_lo = (lo_b['mean'] - lo_b['std']).min() - 0.3
+    bot_hi = max(tuned_hi, sp) + 0.4
+    bot.set_ylim(bot_lo, bot_hi); top.set_ylim(def_lo - 1.5, def_hi + 1.5)
+    bot.axhline(sp, color='k', ls='--', lw=0.9, label='Smart persistence')
+    top.spines['bottom'].set_visible(False); bot.spines['top'].set_visible(False)
+    top.tick_params(bottom=False, labelbottom=False)
+    d = 0.012
+    for ax, yy in ((top, 0), (bot, 1)):
+        ax.plot((-d, +d), (yy - d * 1.6, yy + d * 1.6), transform=ax.transAxes, color='k', clip_on=False, lw=0.8)
+    bot.set_xticks(x); bot.set_xticklabels(MODELS)
+    bot.set_ylabel('Test MAE (W/m²)'); bot.yaxis.set_label_coords(-0.12, 0.8)
+    title(top, i, name)
+    for ax in (top, bot):
+        ax.grid(axis='y', alpha=0.25, lw=0.5)
+    top.set_xlim(bot.get_xlim()); top.set_xticks(x)
+h, l = bot.get_legend_handles_labels()
+h2, l2 = top.get_legend_handles_labels()
+fig.legend(h + h2, l + l2, loc='lower center', ncol=5, frameon=False, fontsize=7, bbox_to_anchor=(0.5, -0.1))
 save(fig, 'f2_reference_comparison')
 
-# ── f3: presupuestos bajos ────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.7), sharey=True)
+# ── f3: presupuestos bajos (ejes independientes) ─────────────────────────────
+fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.9))
 bud = [10, 25, 50, 100]
 for i, m in enumerate(MODELS):
     ax = axes[i]
@@ -109,18 +130,19 @@ for i, m in enumerate(MODELS):
         st = g.groupby('budget').all_mae.agg(['mean', 'std', 'count'])
         st = st.reindex([f'B{b}' for b in bud])
         half = 1.96 * st['std'] / np.sqrt(st['count'])
-        off = (OPTS.index(o) - 3) * 0.012
+        off = (OPTS.index(o) - 3) * 0.035
         xs = np.array(bud) * (1 + off)
-        ax.errorbar(xs, st['mean'], yerr=half, color=COL[o], lw=1, marker='o', ms=2.5,
-                    capsize=1.5, label=lab(o))
+        ax.errorbar(xs, st['mean'], yerr=half, color=COL[o], lw=1, marker=MK[o], ms=3.5,
+                    capsize=1.2, elinewidth=0.6, label=lab(o))
     ax.set_xscale('log'); ax.set_xticks(bud); ax.set_xticklabels(bud)
     ax.minorticks_off()
+    ax.set_xlabel('Evaluations ($b$)')
     title(ax, i, m)
     ax.grid(alpha=0.25, lw=0.5)
 axes[0].set_ylabel('Test MAE (W/m²)')
-fig.supxlabel('Evaluations used to select the incumbent ($b$)', fontsize=8.5, y=-0.05)
 h, l = axes[0].get_legend_handles_labels()
-fig.legend(h, l, loc='lower center', ncol=7, frameon=False, fontsize=7.5, bbox_to_anchor=(0.5, -0.17))
+fig.legend(h, l, loc='lower center', ncol=7, frameon=False, fontsize=7.5, bbox_to_anchor=(0.5, -0.08))
+fig.tight_layout(rect=(0, 0.04, 1, 1))
 save(fig, 'f3_low_budget')
 
 # ── f4: validación vs. prueba ─────────────────────────────────────────────────
@@ -212,7 +234,6 @@ for i, m in enumerate(MODELS):
     ax.set_yticklabels([f'{lab(a)} − {lab(b)}' for a, b in zip(g.A, g.B)], fontsize=6.3)
     title(ax, i, m)
     ax.set_xlim(-2.2, 2.2)
-fig.supxlabel('Paired difference in test MAE (W/m²), mean and 90% BCa interval', fontsize=8.5, y=0.01)
 fig.tight_layout()
 save(fig, 'f8_equivalence')
 
