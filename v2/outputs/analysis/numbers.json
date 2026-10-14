@@ -624,10 +624,10 @@
   0.3
  ],
  "LSTM_hp_importance": {
-  "units_1": 10.6,
-  "units_2": 40.3,
-  "dropout_rate": 27.5,
-  "log10_lr": 17.5,
+  "units_1": 10.9,
+  "units_2": 40.2,
+  "dropout_rate": 27.1,
+  "log10_lr": 17.8,
   "batch_size": 4.0
  },
  "LSTM_roll_median_range": [
@@ -683,10 +683,10 @@
   0.28
  ],
  "GRU_hp_importance": {
-  "units_1": 6.5,
+  "units_1": 6.7,
   "units_2": 45.0,
-  "dropout_rate": 34.3,
-  "log10_lr": 11.1,
+  "dropout_rate": 34.4,
+  "log10_lr": 10.9,
   "batch_size": 3.1
  },
  "GRU_roll_median_range": [

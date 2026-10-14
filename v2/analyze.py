@@ -32,7 +32,7 @@ FULL = f'B{C.BUDGET}'
 def load_runs():
     """Una fila por (corrida, presupuesto) con las métricas de test."""
     rows, hist = [], {}
-    for path in glob.glob(os.path.join(C.RES_DIR, '*', '*.json')):
+    for path in sorted(glob.glob(os.path.join(C.RES_DIR, '*', '*.json'))):   # orden independiente del sistema de archivos
         r = json.load(open(path))
         if r.get('dry') or r.get('tag') == 'repro':      # repro: solo para repro_check.py
             continue
@@ -447,7 +447,7 @@ def hp_importance(hist, n_repeats=30):
     rows = []
     for model in C.MODELS:
         X, y = [], []
-        for (tag, run), h in hist.items():
+        for (tag, run), h in sorted(hist.items()):         # orden fijo: el bosque depende del orden de las filas
             if tag == 'core' and run.startswith(f'{model}_RS_'):
                 for e in h:
                     if e['val_mae'] < 9000:
