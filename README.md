@@ -1,5 +1,7 @@
 # solar-benchmark
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23359088.svg)](https://doi.org/10.5281/zenodo.23359088)
+
 Code, data, and results for the article *"Comparative Benchmark of Metaheuristic and Model-Based Hyperparameter Optimization for Deep Learning Models in Global Solar Irradiance Forecasting"*.
 
 The repository has two parts:
@@ -227,6 +229,14 @@ With a more faithful objective, the guided methods improve on Random Search by a
 - Capping the BOHB-style method at the epochs actually consumed by the other methods changes its incumbent in only 2–4 of 30 runs.
 
 `repro_check.py` compares six runs repeated with the same seed (`run_one.py ... --tag repro`). GPU kernels are not deterministic, so the same configuration does not give exactly the same validation MAE (the difference is exactly zero in about half of the MLP evaluations and never for LSTM/GRU). The repeated runs selected different incumbents, and their test MAE changed by 0.01–4.04 W/m² (median 0.44 W/m²).
+
+## How to cite
+
+If you use the code, the results, or the surrogate benchmark, please cite the archived release:
+
+> Pérez-Rodríguez, S. A., et al. solar-benchmark v2.0.0: HPO benchmark for deep-learning solar irradiance forecasting. Zenodo, 2026. https://doi.org/10.5281/zenodo.23359088
+
+and the article *"Comparative Benchmark of Metaheuristic and Model-Based Hyperparameter Optimization for Deep Learning Models in Global Solar Irradiance Forecasting"* once it is published.
 
 ## License
 
