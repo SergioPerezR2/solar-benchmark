@@ -206,6 +206,17 @@ print(hpo.decode(u), f(u))                    # decoded hyperparameters and vali
 
 The emulation describes how stable the rankings are, conditional on the observed distributions (the 30-seed best is itself uncertain); it illustrates, but does not directly measure, the reliability of published studies. The null rate is the type I error of each design when all means are equal; the excess over it reflects the detection of the small differences present in the observed data, so the two rates must not be read as a proportion of false discoveries. Almost none of the uncorrected "significant improvements" exceed the practical margin of 1 W/m². More runs alone do not make the winner reproducible; correcting for multiple comparisons and requiring a practical margin keep such claims rare.
 
+## Higher-fidelity check
+
+The main experiment trains every candidate for at most 10 epochs during the search. To test whether its conclusions depend on this low fidelity, Random Search, TPE, and PSO were run again on the MLP (seeds 0–9) with up to 50 epochs (patience 5) per evaluation, the same budget of 100 evaluations, and the same final training (`outputs/results/hifi/`; analysis in `fidelity_check.py` → `outputs/analysis/fidelity_check.json`):
+
+| Objective | Spearman ρ, search vs. test | Test MAE RS / TPE / PSO (W/m²) | RS − TPE | RS − PSO | TPE − PSO |
+|---|---|---|---|---|---|
+| 10 epochs | 0.52 | 16.69 / 16.42 / 16.49 | 0.27 [−0.10, 0.76] | 0.20 [−0.16, 0.61] | −0.07 [−0.60, 0.43] |
+| 50 epochs | 0.92 | 16.62 / 15.88 / 15.88 | 0.74 [0.44, 1.02], significant after Holm | 0.74 [0.31, 1.18] | 0.00 [−0.43, 0.31] |
+
+With a more faithful objective, the guided methods improve on Random Search by about 0.74 W/m², while TPE and PSO remain equivalent to each other: the fidelity of the objective matters more than the choice among guided optimizers. With 50 epochs the guided methods also select configurations that train longer (2,402 and 2,823 epochs against 1,754 for Random Search). The check covers only the MLP, three optimizers, and 10 seeds. Running seven 50-epoch MLP runs in parallel needed more than 30 GB of RAM; four runs had to be repeated after being killed by the operating system, which does not affect their results.
+
 ## Robustness and reproducibility checks
 
 `robustness.py` repeats the optimizer comparison with three other error definitions (all hours with night clipping, daytime by GHI threshold, daytime by solar elevation). No pair differs after Holm correction with any definition, 60–63 of the 63 pairs are equivalent within 1 W/m², and the optimizer explains 0.35–0.75% of the variance (ω²) against 7.9–14.1% for the seed. Other results of the same script:
