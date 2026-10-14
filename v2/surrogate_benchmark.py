@@ -291,5 +291,57 @@ def main():
     json.dump({'spearman_all': allr, 'seconds_per_run': t}, open(os.path.join(OUT, 'replay_meta.json'), 'w'))
 
 
+
+def leave_one_optimizer_out(seeds=range(30)):
+    """Validación más estricta: para cada optimizador guiado X, el sustituto se
+    reajusta sin ninguna evaluación de X (y se recalibra con RS), y luego X se
+    ejecuta sobre él. Así X no influye ni en el modelo ni en el ruido."""
+    global OUT
+    main_out = OUT
+    ev = load_evaluations()
+    real = {}
+    for path in glob.glob(os.path.join(C.RES_DIR, 'core', '*.json')):
+        r = json.load(open(path))
+        if r['optimizer'] in OPTS:
+            for b in (10, 25, 50, 100):
+                real.setdefault((r['model'], r['optimizer'], b), []).append(r['history'][b - 1]['best_so_far'])
+    rows = []
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    try:
+        for x in [o for o in OPTS if o != 'RS']:
+            OUT = os.path.join(main_out, f'loo_{x}')
+            fit_and_validate(ev[ev.optimizer != x])
+            calibrate()
+            for m in C.MODELS:
+                vals = {b: [] for b in (10, 25, 50, 100)}
+                for s in seeds:
+                    f = SurrogateObjective(m, seed=10_000 + s)
+                    hist = []
+
+                    def fn(u, report=None, f=f):
+                        return f(u), C.OPT_EPOCHS, False
+
+                    e = hpo.Evaluator(fn, C.BUDGET)
+                    orig = e.evaluate
+
+                    def logged(u, report=None, orig=orig):
+                        v = orig(u, report)
+                        hist.append(min(v, hist[-1]) if hist else v)
+                        return v
+
+                    e.evaluate = logged
+                    hpo.OPTIMIZERS[x](e, s, pop=C.POP_SIZE if x in ('PSO', 'GA', 'ABC') else None)
+                    for b in vals:
+                        vals[b].append(hist[b - 1])
+                for b in vals:
+                    rows.append({'held_out': x, 'model': m, 'eval': b, 'surrogate': float(np.mean(vals[b])),
+                                 'real': float(np.mean(real[(m, x, b)]))})
+    finally:
+        OUT = main_out
+    loo = pd.DataFrame(rows)
+    loo['abs_diff'] = (loo.surrogate - loo.real).abs()
+    loo.to_csv(os.path.join(main_out, 'leave_one_optimizer_out.csv'), index=False)
+    return loo
+
 if __name__ == '__main__':
     main()

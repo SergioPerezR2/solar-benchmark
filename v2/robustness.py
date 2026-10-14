@@ -15,6 +15,10 @@ endpoint primario:
   6. Frecuencia de la fase de exploradoras (scouts) en ABC.
   8. omega² por definición del error, Friedman con recorte nocturno y prueba de
      permutación del F del optimizador.
+  10. Potencia de Wilcoxon + Holm para una diferencia de 1 W/m² y equivalencia
+      con intervalos simultáneos (Bonferroni sobre 63 pares).
+  11. Pruebas pareadas del tamaño de población y presupuesto efectivo del método
+      BOHB (incumbente si se limita al consumo del método más costoso).
   9. Ruido del reentrenamiento final, medido con los incumbentes idénticos de
      PSO, GA y RS con b = 10 (evalúan las mismas 10 configuraciones iniciales).
 
@@ -290,6 +294,59 @@ diffs = np.array(diffs)
 num['retrain_noise'] = {'same_incumbent': int(len(diffs)), 'pairs': n_pairs,
                         'median_abs': float(np.median(np.abs(diffs))), 'max_abs': float(np.abs(diffs).max()),
                         'sd_single': float(diffs.std(ddof=1) / np.sqrt(2))}
+
+# ── 10. Potencia del procedimiento completo y equivalencia simultánea ─────────
+pairs_idx = list(combinations(range(len(OPTS)), 2))
+rng_w = np.random.default_rng(0)
+num['power_holm_1Wm2'], num['simultaneous_equiv_d1'] = {}, {}
+for m in MODELS:
+    X = D[D.model == m].pivot(index='seed', columns='opt', values='all')[OPTS].to_numpy()
+    Xc = X - X.mean(axis=0) + X.mean()          # medias iguales, misma estructura por semilla
+    hits = tot = 0
+    for _ in range(1000):
+        S = Xc[rng_w.integers(0, len(Xc), len(Xc))].copy()
+        a = rng_w.integers(len(OPTS)); S[:, a] += 1.0   # diferencia verdadera de 1 W/m²
+        adj = holm([stats.wilcoxon(S[:, i] - S[:, j]).pvalue for i, j in pairs_idx])
+        for k, (i, j) in enumerate(pairs_idx):
+            if a in (i, j):
+                tot += 1; hits += adj[k] < ALPHA
+    num['power_holm_1Wm2'][m] = hits / tot
+    lvl = 1 - 2 * ALPHA / 63                       # Bonferroni sobre las 63 comparaciones
+    neq = 0
+    for i, j in pairs_idx:
+        ci = stats.bootstrap((X[:, i] - X[:, j],), np.mean, confidence_level=lvl, n_resamples=20000,
+                             method='BCa', random_state=0).confidence_interval
+        neq += -1 < ci.low and ci.high < 1
+    num['simultaneous_equiv_d1'][m] = int(neq)
+
+# ── 11. Tamaño de población y presupuesto efectivo del método BOHB ─────────────
+pop = {}
+for f in glob.glob(os.path.join(C.RES_DIR, 'popsens', '*.json')):
+    r = json.load(open(f))
+    pop[(r['optimizer'], r['pop'], r['seed'])] = final(r, 'B100')['test']['all']['mae']
+rows_p, pv_p = [], []
+for o in ('PSO', 'GA', 'ABC'):
+    base = D[(D.model == 'MLP') & (D.opt == o)].set_index('seed')['all']
+    for n_pop in (5, 20):
+        d = np.array([pop[(o, n_pop, s_)] - base[s_] for s_ in range(30)])
+        ci = stats.bootstrap((d,), np.mean, confidence_level=0.95, n_resamples=10000, method='BCa',
+                             random_state=0).confidence_interval
+        pv_p.append(stats.wilcoxon(d).pvalue)
+        rows_p.append({'opt': o, 'pop': n_pop, 'diff_vs_10': float(d.mean()), 'ci95': [float(ci.low), float(ci.high)]})
+for r_, q in zip(rows_p, holm(pv_p)):
+    r_['p_holm'] = float(q)
+num['popsize_tests'] = rows_p
+num['bohb_capped'] = {}
+for m in MODELS:
+    cap = max(D[(D.model == m) & (D.opt == o)].hpo_epochs.mean() for o in OPTS if o != 'BOHB')
+    full, capped = [], []
+    for s_ in range(30):
+        h = [e for e in recs[(m, 'BOHB', s_)]['history'] if not e['pruned']]
+        full.append(min(e['val_mae'] for e in h))
+        capped.append(min(e['val_mae'] for e in h if e['cum_epochs'] <= cap))
+    full, capped = np.array(full), np.array(capped)
+    num['bohb_capped'][m] = {'cap_epochs': float(cap), 'changed': int((np.abs(full - capped) > 1e-9).sum()),
+                             'mean_val_diff': float((capped - full).mean())}
 
 json.dump(num, open(os.path.join(OUT, 'robustness.json'), 'w'), indent=1, default=float)
 print(EP.round(3).to_string())

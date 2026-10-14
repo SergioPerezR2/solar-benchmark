@@ -39,8 +39,6 @@ gain = rd('hpo_gain_vs_default.csv')
 vt = rd('val_test_correlation.csv').set_index('model')
 pop = rd('popsens.csv')
 imp = rd('hp_importance_rs.csv')
-symb = json.load(open(os.path.join(A, 'symbolic_refit.json'))) if os.path.exists(
-    os.path.join(A, 'symbolic_refit.json')) else None
 
 N = {}
 f2 = lambda x: f'{x:.2f}'
@@ -80,9 +78,6 @@ for ref, name in (('persistence', 'Persistence'), ('smart_persistence', 'Smart p
     rl = refs[(refs.reference == ref) & refs.split.str.startswith('roll') & (refs.block == 'all')]
     lines.append(f"\\multicolumn{{2}}{{l}}{{{name}}} & {f2(t.loc['all','mae'])} & {f2(t.loc['all','rmse'])} & "
                  f"{f2(t.loc['day_ghi50','mae'])} & -- & -- \\\\")
-if symb:
-    lines.append(f"\\multicolumn{{2}}{{l}}{{Symbolic (Eq.~\\ref{{eq:symbolic}})}} & {f2(symb['test_all']['mae'])} & "
-                 f"{f2(symb['test_all']['rmse'])} & {f2(symb['test_day_ghi50']['mae'])} & -- & -- \\\\")
 lines += [r'\bottomrule', r'\end{tabular}']
 out.append(('tab:results_main', '\n'.join(lines)))
 
@@ -327,7 +322,7 @@ if os.path.exists(LD):
     lines = [r'\begin{tabular}{cccccc}', r'\toprule',
              r'$\boldsymbol{n}$ & \textbf{Winner is} & \textbf{Same winner} & \multicolumn{3}{c}{\textbf{Proposed method significantly better than a rival}} \\',
              r'\cmidrule(lr){4-6}',
-             r' & \textbf{true best} & \textbf{in replication} & \textbf{Uncorrected} & \textbf{Holm} & \textbf{Uncorrected, gap $>\delta$} \\', r'\midrule']
+             r' & \textbf{30-seed best} & \textbf{in replication} & \textbf{Uncorrected} & \textbf{Holm} & \textbf{Uncorrected, gap $>\delta$} \\', r'\midrule']
     def both(c, n):
         # valor observado y, entre paréntesis, el esperado por azar con el mismo diseño
         obs = fmt(c, n)

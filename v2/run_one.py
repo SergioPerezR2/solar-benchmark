@@ -189,8 +189,12 @@ def main():
     ap.add_argument('--tag', default='core')
     ap.add_argument('--budget', type=int, default=C.BUDGET)
     ap.add_argument('--no-rolling', action='store_true')
+    ap.add_argument('--opt-epochs', type=int, default=C.OPT_EPOCHS,
+                    help='épocas máximas por evaluación durante la HPO (fidelidad del objetivo)')
+    ap.add_argument('--opt-patience', type=int, default=C.OPT_PATIENCE)
     ap.add_argument('--dry', action='store_true', help='objetivo sintético, sin TF')
     args = ap.parse_args()
+    C.OPT_EPOCHS, C.OPT_PATIENCE = args.opt_epochs, args.opt_patience   # fidelidad del objetivo de HPO
 
     name = run_name(args.model, args.opt, args.seed, args.pop)
     out_dir = os.path.join(C.RES_DIR, args.tag)
@@ -327,7 +331,7 @@ def main():
             'threads': os.environ.get('BENCH_THREADS'),
             'finished': time.strftime('%Y-%m-%d %H:%M:%S'),
         },
-        'config': CFG_SNAPSHOT,
+        'config': {k: getattr(C, k) for k in CFG_SNAPSHOT},   # valores al guardar (incluye --opt-epochs)
     }
 
     npz_tmp = os.path.join(out_dir, name + '.tmp.npz')

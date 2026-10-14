@@ -17,7 +17,8 @@ Seven hyperparameter optimization (HPO) methods are compared on three deep learn
 - **Inputs:** 24-hour window of GHI, clear-sky index, air temperature, wind speed, hour, day of year, month, and the clear-sky GHI of the following hour (Ineichen model, pvlib).
 - **Design:** shared search space encoded in [0, 1]^5, budget of 100 evaluations (1,000 training epochs for the BOHB-style method), and 30 paired seeds per optimizer and architecture. Incumbents after 10, 25, 50, and 100 evaluations are evaluated on the test year.
 - **Runs:** 630 HPO runs, 90 runs with default hyperparameters, and 180 population-size sensitivity runs (PSO, GA, and ABC on the MLP with populations of 5 and 20).
-- **Analysis:** Friedman tests, paired Wilcoxon tests with Holm correction, BCa bootstrap intervals, TOST equivalence tests (δ = 1 W/m², with 0.5 and 2 as sensitivity), Vargha–Delaney Â12, minimum detectable difference, variance decomposition, and an emulation of single-run comparisons.
+- **Analysis:** Friedman tests, paired Wilcoxon tests with Holm correction, BCa bootstrap intervals, TOST equivalence tests (δ = 1 W/m², with 0.5 and 2 as sensitivity), Vargha–Delaney Â12, minimum detectable difference, variance decomposition (η² and ω²), robustness checks, an emulation of the comparison designs used in the literature, and a surrogate benchmark.
+- **Additional experiments:** six runs repeated with the same seed (GPU non-determinism) and a higher-fidelity check (MLP; RS, TPE, and PSO; up to 50 training epochs per evaluation; 10 seeds).
 
 ### Structure
 
@@ -32,11 +33,13 @@ v2/
   launch.sh, Dockerfile      Container launcher used for the experiments
   normalize_results.py       Consistency pass over the result files
   analyze.py                 Statistical analysis -> outputs/analysis/*.csv
-  symbolic_refit.py          Re-fit and bootstrap of the symbolic reference equation
   surrogate_benchmark.py     Surrogate benchmark fitted to all evaluations (see below)
-  robustness.py              Robustness checks: night-clipped and daytime errors, omega² with F tests,
-                             validation-test agreement of the retrained models, shared initial designs,
-                             replay of the ABC scout phase
+  robustness.py              Robustness checks: night-clipped and daytime errors, omega² with F tests
+                             (per error definition and with a permutation test), validation-test agreement
+                             of the retrained models, shared initial designs, ABC scout replay, power of
+                             the full Holm procedure, simultaneous equivalence, retraining noise,
+                             population-size tests, and the effective budget of the BOHB-style method
+  fidelity_check.py          Analysis of the higher-fidelity experiment (50 epochs per evaluation)
   repro_check.py             Compares runs repeated with the same seed (GPU non-determinism)
   figures/                   Scripts for all figures (results_figures.py, f6, i1, i2)
                              and for all tables and numbers in the text (results_tables.py)
@@ -44,6 +47,8 @@ v2/
     data/                    Preprocessed dataset and scalers
     results/core/            720 runs: <MODEL>_<OPTIMIZER>_s<SEED>.json and .npz
     results/popsens/         180 population-size sensitivity runs
+    results/repro/           6 runs repeated with the same seed (reproducibility check)
+    results/hifi/            30 MLP runs with a higher-fidelity objective (50 epochs per evaluation)
     analysis/                Analysis tables (CSV), tables.tex, and numbers.json
     surrogate/               Surrogate models, fidelity, and replay of the optimizers
 ```
@@ -68,12 +73,22 @@ Each result file `*.json` contains the configuration, the full evaluation histor
    python run_one.py --model LSTM --opt TPE --seed 0     # a single run
    ```
    The experiments of the paper were run with `launch.sh` in a Docker container (TensorFlow 2.21 on an NVIDIA RTX 4070); the versions are listed in `v2/requirements.txt`. Progress notifications through ntfy.sh are optional (`NTFY_TOPIC` environment variable).
+
+   The two additional experiments use the same script:
+   ```bash
+   # reproducibility check: repeat a run with the same seed
+   python run_one.py --model MLP --opt PSO --seed 0 --tag repro
+   # higher-fidelity check: up to 50 epochs (patience 5) per evaluation during the search
+   python run_one.py --model MLP --opt TPE --seed 0 --tag hifi --opt-epochs 50 --opt-patience 5 --no-rolling
+   ```
+   **Exact numbers are not reproduced by retraining.** GPU kernels (cuDNN) are not deterministic, so retraining gives slightly different values (see `repro_check.py`: the test MAE of a repeated run changed by 0.44 W/m² in median). The statistical conclusions are reproducible; the exact values of the paper are reproduced by step 4, which recomputes every table and figure from the stored records.
 4. **Analysis, tables, and figures** (from the released results, without retraining):
    ```bash
    python normalize_results.py
    python analyze.py --boot 10000
-   python symbolic_refit.py --boot 300
    python robustness.py
+   python repro_check.py
+   python fidelity_check.py
    python figures/results_tables.py
    python figures/results_figures.py
    python figures/f6_anytime_convergence.py
@@ -102,7 +117,8 @@ The six optimizers of the paper that do not use learning curves (PSO, GA, ABC, C
 |---|---|
 | Rank correlation between predicted and real validation error, for seeds not used to fit the model | 0.62 (GRU), 0.69 (LSTM), 0.85 (MLP) |
 | Mean difference between the real and the surrogate result of the five optimizers not used for calibration (after 10, 25, 50, and 100 evaluations) | 0.25 W/m² (largest 1.03 W/m²) |
-| Rank correlation of all optimizers, architectures, and budgets, real vs. surrogate | 0.96 |
+| Rank correlation of all optimizers, architectures, and budgets, real vs. surrogate | 0.96 (inflated by the differences between budgets; 0.60–0.94 at 100 evaluations) |
+| Leave-one-optimizer-out: surrogate refitted and recalibrated without any evaluation of the optimizer being tested | mean difference 0.27 W/m² (largest 0.90 W/m²) |
 | Worst optimizer after 100 evaluations | Random Search in all three architectures, in the experiment and on the surrogate |
 | Worst optimizer after 10 evaluations on the MLP | CMA-ES, in the experiment and on the surrogate |
 | Time per run of 100 evaluations | 0.2 s (surrogate) vs. 27–83 min (real training) |
@@ -176,23 +192,28 @@ u = np.random.default_rng(0).random(5)
 print(hpo.decode(u), f(u))                    # decoded hyperparameters and validation MAE (W/m2)
 ```
 
-`python surrogate_benchmark.py` refits the surrogate from the released results and repeats the validation against the experiment.
+`python surrogate_benchmark.py` refits the surrogate from the released results and repeats the validation against the experiment; `surrogate_benchmark.leave_one_optimizer_out()` runs the leave-one-optimizer-out validation (`v2/outputs/surrogate/leave_one_optimizer_out.csv`).
 
 ## What the comparison designs used in the literature would conclude
 
 `analyze.py` (function `literature_designs`) resamples the 30-seed results to emulate studies with 1 to 30 runs per optimizer, the designs used in the literature. Each study draws, independently for each optimizer, n of its 30 results with replacement (a plug-in bootstrap: the observed distribution of each optimizer acts as the population). Every quantity is also computed under the null hypothesis of equal means, by centering the results of each optimizer on the grand mean; the null value is given in parentheses. Main results (range over the three architectures, `v2/outputs/analysis/literature_designs.csv`):
 
-| Runs per optimizer | Apparent winner is the true best | Two independent studies agree on the winner | A pre-chosen method looks significantly better than a rival (uncorrected tests) | Same, with Holm correction | Uncorrected, with a difference larger than 1 W/m² |
+| Runs per optimizer | Apparent winner is the 30-seed best | Two independent studies agree on the winner | A pre-chosen method looks significantly better than a rival (uncorrected tests) | Same, with Holm correction | Uncorrected, with a difference larger than 1 W/m² |
 |---|---|---|---|---|---|
 | 1 | 19–22% (14%) | 14–15% (15–16%) | – | – | – |
 | 15 | 33–55% (14%) | 22–35% (15–16%) | 18–30% (10–12%) | 2–4% (0–1%) | 0–9% (0–1%) |
 | 30 | 44–74% (14%) | 27–55% (15–16%) | 27–45% (13–14%) | 4–14% (1–2%) | 0–3% (0%) |
 
-Because the seven optimizers are practically equivalent on this task, any "winner" is mostly due to chance. About half of the uncorrected "significant improvements" are the false positives expected among equivalent methods, and most of the rest are differences below 1 W/m². More runs alone do not fix this; correcting for multiple comparisons and requiring a practical margin do.
+The emulation describes how stable the rankings are, conditional on the observed distributions (the 30-seed best is itself uncertain); it illustrates, but does not directly measure, the reliability of published studies. The null rate is the type I error of each design when all means are equal; the excess over it reflects the detection of the small differences present in the observed data, so the two rates must not be read as a proportion of false discoveries. Almost none of the uncorrected "significant improvements" exceed the practical margin of 1 W/m². More runs alone do not make the winner reproducible; correcting for multiple comparisons and requiring a practical margin keep such claims rare.
 
 ## Robustness and reproducibility checks
 
-`robustness.py` repeats the optimizer comparison with three other error definitions (all hours with night clipping, daytime by GHI threshold, daytime by solar elevation). No pair differs after Holm correction with any definition, and 60–63 of the 63 pairs are equivalent within 1 W/m². It also shows that the weak validation–test agreement comes from the 10-epoch HPO objective, not from the change of year: the validation MAE of the retrained final models has a Spearman correlation of 0.98–0.99 with their test MAE.
+`robustness.py` repeats the optimizer comparison with three other error definitions (all hours with night clipping, daytime by GHI threshold, daytime by solar elevation). No pair differs after Holm correction with any definition, 60–63 of the 63 pairs are equivalent within 1 W/m², and the optimizer explains 0.35–0.75% of the variance (ω²) against 7.9–14.1% for the seed. Other results of the same script:
+
+- The weak validation–test agreement comes from the 10-epoch HPO objective, not from the change of year: within each architecture, the validation MAE of the retrained final models has a Spearman correlation of 0.98–0.99 with their test MAE.
+- A simulation of the full procedure (Wilcoxon tests with Holm correction over 21 pairs) detects a true difference of 1 W/m² with probability 0.83–0.96. The 62 equivalent pairs are individual decisions; with simultaneous (Bonferroni) intervals, 41 of 63 remain equivalent.
+- PSO, GA, and Random Search evaluate the same 10 initial configurations for each seed. When they select the same incumbent at b = 10 (196 of 270 cases), the test MAE still differs by a median of 0.24 W/m², which measures the noise of the final retraining (standard deviation of about 0.57 W/m²).
+- Capping the BOHB-style method at the epochs actually consumed by the other methods changes its incumbent in only 2–4 of 30 runs.
 
 `repro_check.py` compares six runs repeated with the same seed (`run_one.py ... --tag repro`). GPU kernels are not deterministic, so the same configuration does not give exactly the same validation MAE (the difference is exactly zero in about half of the MLP evaluations and never for LSTM/GRU). The repeated runs selected different incumbents, and their test MAE changed by 0.01–4.04 W/m² (median 0.44 W/m²).
 
