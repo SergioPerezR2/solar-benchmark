@@ -18,7 +18,8 @@ Seven hyperparameter optimization (HPO) methods are compared on three deep learn
 - **Data:** PVGIS-ERA5 hourly record for Querétaro, México (lat 20.563425, lon −100.36943889), 2019–2022. Training 2019–2020, validation 2021, test 2022, plus a rolling-origin evaluation over the four quarters of 2022.
 - **Inputs:** 24-hour window of GHI, clear-sky index, air temperature, wind speed, hour, day of year, month, and the clear-sky GHI of the following hour (Ineichen model, pvlib).
 - **Design:** shared search space encoded in [0, 1]^5, budget of 100 evaluations (1,000 training epochs for the BOHB-style method), and 30 paired seeds per optimizer and architecture. Incumbents after 10, 25, 50, and 100 evaluations are evaluated on the test year.
-- **Runs:** 630 HPO runs, 90 runs with default hyperparameters, and 180 population-size sensitivity runs (PSO, GA, and ABC on the MLP with populations of 5 and 20).
+- **Runs:** 630 HPO runs, 90 runs with default hyperparameters, and 180 population-size sensitivity runs (PSO, GA, and ABC on the MLP with populations of 5 and 20), 900 in total; the higher-fidelity check adds 30 runs (930 in all experiments).
+- **Equivalence margins:** the primary margin (δ = 1 W/m²) and the sensitivity margins (0.5 and 2 W/m²) are set in `v2/config.py` (`TOST_DELTA`, `TOST_DELTA_SENS`) and were fixed before the benchmark runs were launched.
 - **Analysis:** Friedman tests, paired Wilcoxon tests with Holm correction, BCa bootstrap intervals, TOST equivalence tests (δ = 1 W/m², with 0.5 and 2 as sensitivity), Vargha–Delaney Â12, minimum detectable difference, variance decomposition (η² and ω²), robustness checks, an emulation of the comparison designs used in the literature, and a surrogate benchmark.
 - **Additional experiments:** six runs repeated with the same seed (GPU non-determinism) and a higher-fidelity check (MLP; RS, TPE, and PSO; up to 50 training epochs per evaluation; 10 seeds).
 
